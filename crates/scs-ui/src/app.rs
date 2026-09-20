@@ -56,7 +56,8 @@ pub fn start(app: &adw::Application) {
         sidebar_list.select_row(Some(&row));
     }
 
-    let record = Rc::new(pages::record::RecordPage::new(&state));
+    let record = Rc::new(pages::record::RecordPage::new(&state, &window));
+    record.connect(&record, &state);
     let diagnostics = pages::diagnostics::DiagnosticsPage::new(&state, &window);
     let stack = gtk::Stack::new();
     stack.set_transition_type(gtk::StackTransitionType::Crossfade);
@@ -112,7 +113,7 @@ pub fn start(app: &adw::Application) {
         about.set_version(scs_core::APP_VERSION);
         about.set_developer_name("Shadowfetch");
         about.set_comments(
-            "Milestone 2: live camera preview and audio meters. Recording and live streaming are not implemented yet.",
+            "Milestone 3: local MKV recording for Camera, Voice, and Creator. Live streaming is not implemented yet.",
         );
         about.set_license_type(gtk::License::MitX11);
         about.present();

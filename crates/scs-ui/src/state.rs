@@ -1,9 +1,11 @@
 use std::cell::RefCell;
 use std::path::PathBuf;
+use std::time::Instant;
 
 use scs_core::{
     RecordingMode, Settings, SettingsStore, APP_NAME,
 };
+use scs_encoder::{capabilities_from_encoder_list, EncoderCapabilities};
 use scs_system::SystemMonitor;
 
 pub struct StudioState {
@@ -11,6 +13,19 @@ pub struct StudioState {
     pub store: SettingsStore,
     pub monitor: RefCell<SystemMonitor>,
     pub encoder_status: RefCell<String>,
+    pub caps: EncoderCapabilities,
+    pub recording: RefCell<RecordingUi>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct RecordingUi {
+    pub active: bool,
+    pub started: Option<Instant>,
+    pub path: Option<PathBuf>,
+    pub encoder: String,
+    pub warning: Option<String>,
+    pub dropped: Option<u64>,
+    pub last_message: Option<String>,
 }
 
 impl StudioState {
@@ -18,12 +33,14 @@ impl StudioState {
         let store = SettingsStore::default_location();
         let settings = store.load().unwrap_or_else(|_| Settings::recommended());
         let disk = settings.recording.folder.clone();
-        let encoder_status = probe_encoder_status();
+        let (caps, encoder_status) = probe_encoders();
         Self {
             settings: RefCell::new(settings),
             store,
             monitor: RefCell::new(SystemMonitor::new(disk)),
             encoder_status: RefCell::new(encoder_status),
+            caps,
+            recording: RefCell::new(RecordingUi::default()),
         }
     }
 
@@ -34,6 +51,9 @@ impl StudioState {
     }
 
     pub fn select_mode(&self, mode: RecordingMode) -> Result<(), String> {
+        if self.recording.borrow().active {
+            return Err("Finish the current take before changing mode.".into());
+        }
         self.settings.borrow_mut().last_recording_mode = mode;
         self.persist()
     }
@@ -66,26 +86,34 @@ impl StudioState {
     }
 }
 
-fn probe_encoder_status() -> String {
+fn probe_encoders() -> (EncoderCapabilities, String) {
     let output = std::process::Command::new("ffmpeg")
         .args(["-hide_banner", "-encoders"])
         .output();
     match output {
         Ok(out) => {
             let text = String::from_utf8_lossy(&out.stdout);
-            let caps = scs_encoder::capabilities_from_encoder_list(&text);
-            if caps.h264_nvenc.is_available() {
-                "NVENC ready · idle".into()
+            let caps = capabilities_from_encoder_list(&text);
+            let status = if caps.h264_nvenc.is_available() {
+                "h264_nvenc ready · idle"
+            } else if caps.hevc_nvenc.is_available() {
+                "hevc_nvenc ready · idle"
+            } else if caps.av1_nvenc.is_available() {
+                "av1_nvenc ready · idle"
             } else if caps.libx264.is_available() {
-                "libx264 ready · idle".into()
+                "libx264 ready · idle"
             } else {
-                "Unavailable — no known encoder listed".into()
-            }
+                "Unavailable — no known encoder listed"
+            };
+            (caps, status.into())
         }
-        Err(_) => "Unavailable — ffmpeg not available".into(),
+        Err(_) => (
+            EncoderCapabilities::unknown(),
+            "Unavailable — ffmpeg not available".into(),
+        ),
     }
 }
 
 pub fn app_subtitle() -> String {
-    format!("{APP_NAME} · Milestone 2")
+    format!("{APP_NAME} · Milestone 3")
 }

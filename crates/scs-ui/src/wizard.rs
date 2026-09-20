@@ -276,7 +276,7 @@ impl DeviceStep {
 fn welcome_page() -> gtk::Box {
     page_frame(
         "Welcome to Shadow Creator Studio",
-        "A simple creator surface on top of OBS, FFmpeg, PipeWire, and NVIDIA NVENC.\n\nMilestone 2 lists cameras and PipeWire audio and previews them on the Record page. START RECORDING and GO LIVE stay disabled until later milestones.",
+        "A simple creator surface on top of OBS, FFmpeg, PipeWire, and NVIDIA NVENC.\n\nMilestone 3 records Camera, Voice, and Creator to a crash-safe MKV. Screen/Presentation and GO LIVE stay unavailable.",
     )
 }
 
@@ -386,7 +386,7 @@ fn review_page(state: &StudioState) -> gtk::Box {
 fn ready_page() -> gtk::Box {
     page_frame(
         "You're ready to preview.",
-        "The studio can list devices and show a live camera plus meters. Press Close, then use Record.\n\nSTART RECORDING remains disabled until Milestone 3 — that is intentional.",
+        "The studio can list devices, preview, and record Camera, Voice, and Creator takes to MKV. Press Close, then use Record.\n\nGO LIVE remains disabled until a later milestone.",
     )
 }
 

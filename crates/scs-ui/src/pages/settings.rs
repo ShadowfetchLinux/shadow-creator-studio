@@ -2,7 +2,8 @@ use std::rc::Rc;
 
 use adw::prelude::*;
 use scs_core::quality::QualityPreset;
-use scs_core::settings::AudioProcessingPreset;
+use scs_core::settings::{AudioProcessingPreset, EncoderPreference};
+use scs_encoder::listed_hardware;
 
 use crate::state::StudioState;
 
@@ -259,7 +260,7 @@ fn recording_group(state: &Rc<StudioState>, window: &adw::ApplicationWindow) -> 
 
     let remux = adw::SwitchRow::builder()
         .title("Remux to MP4 after recording")
-        .subtitle("Copy remux in M6. The MKV is never deleted until the MP4 verifies.")
+        .subtitle("Copy remux after stop. The MKV is never deleted, even after the MP4 verifies.")
         .active(state.settings.borrow().recording.remux_to_mp4)
         .build();
     let state_r = Rc::clone(state);
@@ -315,13 +316,46 @@ fn advanced_group(state: &Rc<StudioState>) -> adw::PreferencesGroup {
     group.set_title("Advanced");
     let engine = adw::ActionRow::builder()
         .title("Recording engine")
-        .subtitle("Auto: OBS WebSocket when available, otherwise FFmpeg")
+        .subtitle("FFmpeg in Milestone 3. OBS WebSocket is the later primary engine.")
         .build();
     group.add(&engine);
-    let encoder = adw::ActionRow::builder()
+
+    let listed = listed_hardware(&state.caps);
+    let hardware = if listed.is_empty() {
+        "FFmpeg did not list NVENC on this machine.".into()
+    } else {
+        format!("Listed: {}", listed.join(", "))
+    };
+    let model = gtk::StringList::new(&[
+        "Auto (NVENC if listed)",
+        "NVENC H.264",
+        "NVENC HEVC",
+        "NVENC AV1",
+        "Software libx264",
+    ]);
+    let encoder = adw::ComboRow::builder()
         .title("Encoder preference")
-        .subtitle(format!("{:?}", state.settings.borrow().advanced.encoder))
+        .subtitle(hardware)
+        .model(&model)
         .build();
+    encoder.set_selected(match state.settings.borrow().advanced.encoder {
+        EncoderPreference::AutoNvenc => 0,
+        EncoderPreference::NvencH264 => 1,
+        EncoderPreference::NvencHevc => 2,
+        EncoderPreference::NvencAv1 => 3,
+        EncoderPreference::SoftwareX264 => 4,
+    });
+    let state_e = Rc::clone(state);
+    encoder.connect_selected_notify(move |row| {
+        state_e.settings.borrow_mut().advanced.encoder = match row.selected() {
+            1 => EncoderPreference::NvencH264,
+            2 => EncoderPreference::NvencHevc,
+            3 => EncoderPreference::NvencAv1,
+            4 => EncoderPreference::SoftwareX264,
+            _ => EncoderPreference::AutoNvenc,
+        };
+        let _ = state_e.persist();
+    });
     group.add(&encoder);
     group
 }

@@ -1,5 +1,7 @@
 pub mod meters;
+pub mod plan;
 pub mod preview;
+pub mod record;
 
 use std::sync::mpsc::{self, Receiver};
 use std::thread;

@@ -12,6 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 adw = { package = "libadwaita", version = "0.7.2", features = ["v1_5"] }
+chrono.workspace = true
 glib = "0.20"
 gtk = { package = "gtk4", version = "0.9.6", features = ["v4_14"] }
 scs-audio.workspace = true

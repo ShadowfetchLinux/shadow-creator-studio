@@ -4,17 +4,20 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 
+use adw::prelude::*;
 use gtk::gdk::prelude::MonitorExt;
 use gtk::gio::prelude::ListModelExt;
-use gtk::prelude::*;
 use scs_capture::{DeviceInventory, DisplaySource};
 use scs_core::RecordingMode;
 use scs_system::SystemSnapshot;
 
 use crate::live::meters::{self as meter_live, MeterEvent};
+use crate::live::plan;
 use crate::live::preview::{self as preview_live, PreviewEvent};
+use crate::live::record::{self as rec_live, RecordEvent};
 use crate::state::StudioState;
 use crate::widgets::{dashboard, meters, mode_tiles, preview, sources, status_strip};
+use scs_core::stop_requires_confirmation;
 
 pub struct RecordPage {
     pub root: gtk::ScrolledWindow,
@@ -26,6 +29,11 @@ pub struct RecordPage {
     live: RefCell<LiveSessions>,
     inventory: RefCell<DeviceInventory>,
     displays: RefCell<Vec<DisplaySource>>,
+    window: adw::ApplicationWindow,
+    rec_btn: gtk::Button,
+    rec_note: gtk::Label,
+    rec_stop: RefCell<Option<Arc<AtomicBool>>>,
+    rec_rx: RefCell<Option<Receiver<RecordEvent>>>,
 }
 
 struct LiveSessions {
@@ -57,7 +65,7 @@ impl LiveSessions {
 }
 
 impl RecordPage {
-    pub fn new(state: &Rc<StudioState>) -> Self {
+    pub fn new(state: &Rc<StudioState>, window: &adw::ApplicationWindow) -> Self {
         let column = gtk::Box::new(gtk::Orientation::Vertical, 16);
         column.set_margin_top(20);
         column.set_margin_bottom(24);
@@ -85,15 +93,14 @@ impl RecordPage {
         let rec = gtk::Button::with_label("START RECORDING");
         rec.add_css_class("scs-rec-button");
         rec.add_css_class("destructive-action");
-        rec.set_sensitive(false);
         rec.set_halign(gtk::Align::Center);
-        rec.set_tooltip_text(Some("Available in a later milestone (M3)"));
 
         let rec_note = gtk::Label::new(Some(
-            "Available in a later milestone — Milestone 2 previews only. Nothing is recorded.",
+            "Camera, Voice, and Creator write an MKV. Screen and Presentation stay unavailable.",
         ));
         rec_note.add_css_class("scs-unavailable");
         rec_note.set_halign(gtk::Align::Center);
+        rec_note.set_wrap(true);
 
         let live_card = gtk::Box::new(gtk::Orientation::Vertical, 8);
         live_card.add_css_class("scs-card");
@@ -106,7 +113,7 @@ impl RecordPage {
         live_btn.set_halign(gtk::Align::Start);
         live_btn.set_tooltip_text(Some("Available in a later milestone (M8)"));
         let live_note = gtk::Label::new(Some(
-            "YouTube Live is designed here for later expansion. Unavailable in Milestone 2.",
+            "YouTube Live is designed here for later expansion. Unavailable in Milestone 3.",
         ));
         live_note.add_css_class("scs-unavailable");
         live_note.set_halign(gtk::Align::Start);
@@ -147,7 +154,21 @@ impl RecordPage {
             live: RefCell::new(LiveSessions::new()),
             inventory: RefCell::new(DeviceInventory::default()),
             displays: RefCell::new(Vec::new()),
+            window: window.clone(),
+            rec_btn: rec,
+            rec_note,
+            rec_stop: RefCell::new(None),
+            rec_rx: RefCell::new(None),
         }
+    }
+
+    pub fn connect(&self, page: &Rc<Self>, state: &Rc<StudioState>) {
+        let page_c = Rc::clone(page);
+        let state_c = Rc::clone(state);
+        self.rec_btn.connect_clicked(move |_| {
+            page_c.on_record_clicked(&state_c);
+        });
+        self.refresh_record_chrome(state);
     }
 
     pub fn apply_inventory(&self, inventory: DeviceInventory, state: &Rc<StudioState>) {
@@ -168,8 +189,11 @@ impl RecordPage {
     }
 
     pub fn refresh(&self, state: &Rc<StudioState>, snap: &SystemSnapshot) {
+        self.watch_disk(state, snap);
+        self.drain_record(state);
         self.sync_sessions(state);
         self.pump(state, snap);
+        self.refresh_record_chrome(state);
     }
 
     pub fn pump(&self, state: &StudioState, snap: &SystemSnapshot) {
@@ -180,6 +204,21 @@ impl RecordPage {
     }
 
     pub fn sync_sessions(&self, state: &Rc<StudioState>) {
+        if state.recording.borrow().active {
+            self.stop_preview();
+            if let Some(path) = state.recording.borrow().path.as_ref() {
+                self.preview.show_message(
+                    "Recording",
+                    &format!(
+                        "Writing {}\nCamera preview is paused so the take can own the device.",
+                        path.file_name()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_else(|| path.display().to_string())
+                    ),
+                );
+            }
+            return;
+        }
         let mode = state.settings.borrow().last_recording_mode;
         let inventory = self.inventory.borrow();
         let settings = state.settings.borrow();
@@ -314,6 +353,173 @@ impl RecordPage {
         }
         live.preview_rx = None;
         live.cam_key = None;
+    }
+
+    fn on_record_clicked(&self, state: &Rc<StudioState>) {
+        if state.recording.borrow().active {
+            if stop_requires_confirmation() {
+                let dialog = adw::AlertDialog::new(
+                    Some("Stop recording?"),
+                    Some("The MKV is kept. Stopping does not delete the take."),
+                );
+                dialog.add_response("cancel", "Keep recording");
+                dialog.add_response("stop", "Stop");
+                dialog.set_response_appearance("stop", adw::ResponseAppearance::Destructive);
+                let stop = self.rec_stop.borrow().as_ref().map(Arc::clone);
+                dialog.connect_response(None, move |_, response| {
+                    if response == "stop" {
+                        if let Some(stop) = &stop {
+                            stop.store(true, Ordering::Relaxed);
+                        }
+                    }
+                });
+                dialog.present(Some(&self.window));
+            } else if let Some(stop) = self.rec_stop.borrow().as_ref() {
+                stop.store(true, Ordering::Relaxed);
+            }
+            return;
+        }
+        if let Err(err) = self.start_take(state) {
+            self.alert("Cannot start recording", &err);
+        }
+    }
+
+    fn start_take(&self, state: &Rc<StudioState>) -> Result<(), String> {
+        let disk = state.monitor.borrow_mut().snapshot().disk;
+        let request = plan::build_request(state, &self.inventory.borrow(), disk)?;
+        let remux = state.settings.borrow().recording.remux_to_mp4;
+        self.stop_preview();
+        let stop = Arc::new(AtomicBool::new(false));
+        let rx = rec_live::start_session(request, remux, Arc::clone(&stop));
+        *self.rec_stop.borrow_mut() = Some(stop);
+        *self.rec_rx.borrow_mut() = Some(rx);
+        let mut rec = state.recording.borrow_mut();
+        rec.active = true;
+        rec.started = Some(std::time::Instant::now());
+        rec.warning = None;
+        rec.dropped = None;
+        rec.last_message = Some("Status: Starting…".into());
+        Ok(())
+    }
+
+    fn drain_record(&self, state: &Rc<StudioState>) {
+        let mut events = Vec::new();
+        if let Some(rx) = self.rec_rx.borrow().as_ref() {
+            while let Ok(event) = rx.try_recv() {
+                events.push(event);
+            }
+        }
+        for event in events {
+            match event {
+                RecordEvent::Started { path, encoder } => {
+                    let mut rec = state.recording.borrow_mut();
+                    rec.active = true;
+                    rec.path = Some(path);
+                    rec.encoder = encoder.clone();
+                    rec.started = rec.started.or(Some(std::time::Instant::now()));
+                    *state.encoder_status.borrow_mut() = format!("{encoder} · recording");
+                }
+                RecordEvent::Progress {
+                    frame,
+                    out_time_ms,
+                    drop_frames,
+                } => {
+                    let mut rec = state.recording.borrow_mut();
+                    if rec.started.is_none() && out_time_ms > 0 {
+                        rec.started = Some(
+                            std::time::Instant::now()
+                                - std::time::Duration::from_millis(out_time_ms),
+                        );
+                    }
+                    rec.dropped = drop_frames.or(rec.dropped);
+                    if frame > 0 && rec.warning.is_none() {
+                        rec.last_message = Some(format!("Status: Recording · {frame} frames"));
+                    }
+                }
+                RecordEvent::Warning(message) => {
+                    state.recording.borrow_mut().warning = Some(message);
+                }
+                RecordEvent::Finished { message, remuxed } => {
+                    let extra = remuxed
+                        .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+                        .map(|name| format!(" · {name}"))
+                        .unwrap_or_default();
+                    self.finish_take(state, &format!("Status: Idle · {message}{extra}"));
+                }
+                RecordEvent::Failed(message) => {
+                    self.finish_take(state, &format!("Status: Idle · {message}"));
+                    self.alert("Recording failed", &message);
+                }
+            }
+        }
+    }
+
+    fn finish_take(&self, state: &StudioState, status: &str) {
+        *self.rec_stop.borrow_mut() = None;
+        *self.rec_rx.borrow_mut() = None;
+        let encoder = state
+            .recording
+            .borrow()
+            .encoder
+            .clone();
+        let mut rec = state.recording.borrow_mut();
+        rec.active = false;
+        rec.started = None;
+        rec.last_message = Some(status.into());
+        rec.warning = None;
+        if !encoder.is_empty() {
+            *state.encoder_status.borrow_mut() = format!("{encoder} ready · idle");
+        }
+    }
+
+    fn watch_disk(&self, state: &StudioState, snap: &SystemSnapshot) {
+        if !state.recording.borrow().active {
+            return;
+        }
+        let Some(disk) = snap.disk else {
+            return;
+        };
+        if disk.emergency_stop() {
+            state.recording.borrow_mut().warning =
+                Some("Disk almost full — stopping to protect the take".into());
+            if let Some(stop) = self.rec_stop.borrow().as_ref() {
+                stop.store(true, Ordering::Relaxed);
+            }
+        } else if disk.warn_low() {
+            state.recording.borrow_mut().warning = Some("Low disk space".into());
+        }
+    }
+
+    fn refresh_record_chrome(&self, state: &StudioState) {
+        let mode = state.settings.borrow().last_recording_mode;
+        let recording = state.recording.borrow().active;
+        if recording {
+            self.rec_btn.set_label("STOP RECORDING");
+            self.rec_btn.set_sensitive(true);
+            self.rec_btn
+                .set_tooltip_text(Some("Asks for confirmation before stopping"));
+            self.rec_note.set_text("Recording. Stop asks for confirmation. The MKV is never deleted automatically.");
+            return;
+        }
+        self.rec_btn.set_label("START RECORDING");
+        if let Some(reason) = mode.unavailable_reason() {
+            self.rec_btn.set_sensitive(false);
+            self.rec_btn.set_tooltip_text(Some(reason));
+            self.rec_note.set_text(reason);
+        } else {
+            self.rec_btn.set_sensitive(true);
+            self.rec_btn
+                .set_tooltip_text(Some("Writes a crash-safe MKV. Screen modes stay unavailable."));
+            self.rec_note.set_text(
+                "Camera, Voice, and Creator write an MKV. Creator muxes desktop audio as a second track when a monitor is selected.",
+            );
+        }
+    }
+
+    fn alert(&self, title: &str, body: &str) {
+        let dialog = adw::AlertDialog::new(Some(title), Some(body));
+        dialog.add_response("ok", "OK");
+        dialog.present(Some(&self.window));
     }
 
     fn drain_preview(&self) {

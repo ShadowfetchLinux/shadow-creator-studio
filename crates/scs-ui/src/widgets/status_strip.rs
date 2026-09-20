@@ -1,5 +1,5 @@
 use gtk::prelude::*;
-use scs_core::disk::{format_bytes, format_duration_seconds};
+use scs_core::disk::{format_bytes, format_clock, format_duration_seconds};
 use scs_system::SystemSnapshot;
 
 use crate::state::StudioState;
@@ -87,14 +87,49 @@ impl StatusStrip {
             .or_else(|| settings.camera.device.clone())
             .unwrap_or_else(|| "Unavailable — no camera".into());
 
+        let rec = state.recording.borrow();
+        let (status, timer, encoder) = if rec.active {
+            let elapsed = rec
+                .started
+                .map(|t| t.elapsed().as_secs())
+                .unwrap_or(0);
+            let warn = rec
+                .warning
+                .as_deref()
+                .map(|w| format!(" · {w}"))
+                .unwrap_or_default();
+            let drop = rec
+                .dropped
+                .map(|n| format!(" · dropped {n}"))
+                .unwrap_or_default();
+            (
+                format!("Status: Recording{warn}{drop}"),
+                format!("Timer: {}", format_clock(elapsed)),
+                if rec.encoder.is_empty() {
+                    format!("Encoder: {}", state.encoder_status.borrow())
+                } else {
+                    format!("Encoder: {} · recording", rec.encoder)
+                },
+            )
+        } else {
+            (
+                rec.last_message
+                    .clone()
+                    .unwrap_or_else(|| "Status: Idle".into()),
+                "Timer: 00:00:00".into(),
+                format!("Encoder: {}", state.encoder_status.borrow()),
+            )
+        };
+        drop(rec);
+
         let values = [
-            "Status: Idle · recording starts in Milestone 3".to_string(),
-            "Timer: 00:00:00".into(),
+            status,
+            timer,
             disk,
             cpu,
             gpu,
             vram,
-            format!("Encoder: {}", state.encoder_status.borrow()),
+            encoder,
             format!(
                 "Picture: {}×{} @ {} fps",
                 settings.video.width, settings.video.height, settings.video.fps
