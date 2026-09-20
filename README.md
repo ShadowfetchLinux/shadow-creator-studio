@@ -5,8 +5,8 @@ tutorials, and voice — with a simple creator-focused interface. The long-term
 engine is OBS Studio (via WebSocket) with FFmpeg + NVIDIA NVENC as the
 tooling and fallback path.
 
-**Milestone 2** lists cameras and PipeWire audio, shows a live camera preview
-and real meters, and still does **not** record or go live.
+**Milestone 3** records Camera, Voice, and Creator takes to a crash-safe MKV.
+Screen/Presentation and GO LIVE stay unavailable.
 
 ## Screenshots
 
@@ -20,7 +20,7 @@ and real meters, and still does **not** record or go live.
 | Diagnostics | ![Diagnostics](docs/screenshots/diagnostics.png) |
 | First-run wizard | ![Wizard](docs/screenshots/wizard.png) |
 
-## What works in Milestone 2
+## What works in Milestone 3
 
 - Everything from Milestone 1 (shell, settings, wizard, diagnostics, dashboard)
 - Camera selector with name, resolution, and pixel format (not raw `/dev/videoN` as the only label)
@@ -30,12 +30,18 @@ and real meters, and still does **not** record or go live.
 - Multi-monitor display tiles from the session; window and region capture stay labeled unavailable
 - Last camera, mic, desktop source, display, and recording mode persist in settings
 - Background discovery — the UI does not freeze while probing devices
+- **START RECORDING** for Camera (cam+mic), Voice (mic), and Creator (cam+mic, desktop as a second AAC track when a monitor is selected)
+- Crash-safe **MKV** names like `2026-09-20_YouTube_Record_001.mkv` — never overwrites
+- Hardware encode when FFmpeg lists NVENC (H.264 / HEVC / AV1); otherwise libx264
+- Quality presets: YouTube Standard / High Quality / 4K, Archival, Small File, Custom
+- Optional copy remux to MP4 after stop. The MKV is **never** deleted
+- Live timer, real encoder name, disk warnings, stop confirmation
 
 ## What is intentionally unavailable
 
 | Control | Label |
 | --- | --- |
-| START RECORDING | Available in a later milestone (M3) |
+| Screen / Presentation record | Unavailable — no portal/desktop grab yet |
 | GO LIVE | Available in a later milestone (M8) |
 | Window / region capture | Structured, labeled unavailable |
 | Live desktop frames | Selected-display placeholder (portal capture is later) |
@@ -105,7 +111,7 @@ $XDG_VIDEOS_DIR/Shadow Creator Studio
 
 - Target container: **MKV** (crash-safe). Optional remux to MP4 without re-encode
   starts in M6. The MKV is never deleted until the MP4 verifies.
-- Separate audio tracks are the plan (mic vs desktop). Not captured yet.
+- Creator muxes mic and desktop as **separate AAC tracks** when a desktop monitor is selected. Processing still arrives in M4.
 - Preferred future encoder: **NVIDIA NVENC** (`h264_nvenc`, plus HEVC/AV1 when
   FFmpeg lists them).
 - Primary future record engine: **OBS via obs-websocket**. FFmpeg is remux /
@@ -123,19 +129,17 @@ $XDG_VIDEOS_DIR/Shadow Creator Studio
 
 On a machine with an NVIDIA driver and NVENC-capable FFmpeg, the dashboard reads
 GPU load, VRAM, and temperature through NVML when initialization succeeds. It
-does not spawn `nvidia-smi` every tick. Idle encoder rows are expected until M3.
+does not spawn `nvidia-smi` every tick. While recording, the status chip shows
+the FFmpeg encoder actually in use.
 
-## Known limitations (M2)
+## Known limitations (M3)
 
-- START RECORDING and GO LIVE stay disabled. Nothing is written to disk.
-- Screen/Presentation modes show the selected display name, not live desktop frames.
-  Portal / PipeWire screen capture is later.
+- Screen and Presentation do **not** record. Portal / desktop grab is later.
+- GO LIVE stays disabled.
+- Recording uses **FFmpeg** (structured argv). OBS WebSocket is still later.
 - Window and region capture are structured types only.
-- Camera preview uses FFmpeg V4L2 → RGB24. If the device is busy or FFmpeg fails,
-  the preview shows a human-readable error instead of a fake frame.
-- Meters use `pw-record` against a PipeWire node. The app never writes WirePlumber,
-  EasyEffects, or default source/sink configuration.
-- Encoder “ready” means FFmpeg advertised the encoder, not that a test encode ran.
+- Camera preview pauses while recording so the take can own V4L2.
+- The app never writes WirePlumber, EasyEffects, or default source/sink configuration.
 - OBS WebSocket is detected as a binary/plugin at most; no login, no scenes.
 
 ## License

@@ -88,9 +88,17 @@ Pulse remains a compatibility path.
 
 This app must not rewrite default sources/sinks.
 
-## OBS is installed but the app says recording is unavailable
+## Recording will not start
 
-Correct until Milestone 3. Prefer a single OBS install and enable
+- Camera and Creator need a camera **and** a microphone.
+- Voice needs a microphone.
+- Screen / Presentation do not record yet.
+- The recordings folder must have more than 1 GiB free.
+- If the camera is in another app, close it — preview pauses during a take so FFmpeg can open V4L2.
+
+## OBS is installed but the take uses FFmpeg
+
+Correct in Milestone 3. OBS via obs-websocket is the later primary engine. Prefer a single OBS install and enable
 obs-websocket when that milestone lands.
 
 ## EasyEffects is missing

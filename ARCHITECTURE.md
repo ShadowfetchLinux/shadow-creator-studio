@@ -29,7 +29,7 @@ recorded in this repository.
 | PipeWire | 1.x with Pulse compatibility | Native capture starts in M2 |
 | PipeWire **dev** | `libpipewire-0.3-dev` | Not required; M2 uses `pw-dump` / `pw-record` |
 | FFmpeg | 6.x with `h264_nvenc` when NVIDIA is present | Also used for remux/probe |
-| OBS Studio | Optional in M1 | Primary record engine from M3 via obs-websocket |
+| OBS Studio | Optional | Planned primary record engine via obs-websocket (later). M3 uses FFmpeg |
 | EasyEffects | Optional | Compatible in concept; never auto-configured |
 | libsecret | Runtime later for stream keys | Dev package when the keyring backend lands |
 
@@ -181,7 +181,7 @@ Default recordings: `$XDG_VIDEOS_DIR/Shadow Creator Studio` (usually `~/Videos/.
 
 Disabled + labeled. Examples already in the shell:
 
-- START RECORDING — later milestone (M3)
+- START RECORDING — Camera / Voice / Creator (FFmpeg MKV). Screen / Presentation stay unavailable
 - GO LIVE — later milestone (M8)
 - Window / region capture — labeled unavailable
 - Live desktop frames — selected-display placeholder until portal capture
@@ -194,7 +194,7 @@ Disabled + labeled. Examples already in the shell:
 | --- | --- | --- |
 | **M1** | Application shell | This milestone. Window, navigation, Record page chrome, mode tiles (persisted), Settings structure + restore defaults, Diagnostics (real probes + copy redacted report), first-run wizard shell, system dashboard (cheap live metrics), foundation libraries + tests. **Does not record.** |
 | **M2** | Device discovery + live preview | Cameras (name/resolution/FPS), PipeWire mics, desktop monitors, live camera preview + mirror, peak/average meters + clip, persist last devices/mode. **Does not record.** |
-| **M3** | Recording | OBS WebSocket primary, FFmpeg fallback, NVENC, MKV, timer, start/stop honesty, long-session watchdog |
+| **M3** | Recording | FFmpeg local MKV for Camera / Voice / Creator, NVENC when listed, timer, stop confirm, optional copy remux (MKV kept). Screen grab and OBS WebSocket still later |
 | **M4** | Audio processing | HPF → denoise → gate → EQ → compressor → limiter; Natural vs Raw |
 | **M5** | Picture | Screen + webcam composition, layouts, preview (still honest about limits) |
 | **M6** | Library | Index, markers, remux MKV→MP4 without re-encode, never delete MKV until verified |
@@ -226,13 +226,20 @@ Disabled + labeled. Examples already in the shell:
 - Display selector from GDK monitors; honest placeholder for screen modes
 - Persist last camera, mic, desktop source, display, mode, and mirror flag
 
+**In M3**
+
+- FFmpeg record plans (structured argv) for Camera, Voice, Creator
+- NVENC when FFmpeg lists it; libx264 fallback
+- Live timer, encoder name, disk reserve / emergency stop
+- Optional copy remux to MP4; MKV is never deleted
+- Stop always asks for confirmation
+
 **Explicitly later**
 
-- Any actual recording or streaming
-- Portal / live desktop frames
+- Portal / live desktop frames and Screen/Presentation recording
 - Audio processing
-- OBS WebSocket session
-- Remux, library playback, teleprompter, Whisper, YouTube APIs
+- OBS WebSocket session (still the planned *primary* engine)
+- Library playback, teleprompter, Whisper, YouTube APIs
 - Writing PipeWire / EasyEffects / system audio configuration
 
 ## Security notes
