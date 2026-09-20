@@ -873,7 +873,8 @@ dependencies = [
 name = "scs-capture"
 version = "0.1.0"
 dependencies = [
- "scs-core",
+ "scs-audio",
+ "scs-pipewire",
  "serde",
  "serde_json",
 ]
@@ -942,7 +943,9 @@ dependencies = [
 name = "scs-pipewire"
 version = "0.1.0"
 dependencies = [
+ "scs-audio",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -971,6 +974,7 @@ dependencies = [
  "gtk4",
  "libadwaita",
  "scs-audio",
+ "scs-capture",
  "scs-core",
  "scs-diagnostics",
  "scs-encoder",

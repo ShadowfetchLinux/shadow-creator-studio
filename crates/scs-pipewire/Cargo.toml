@@ -3,7 +3,9 @@ name = "scs-pipewire"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "PipeWire presence detection (no session in M1)"
+description = "PipeWire presence detection and pw-dump device listing"
 
 [dependencies]
+scs-audio.workspace = true
 serde.workspace = true
+serde_json.workspace = true

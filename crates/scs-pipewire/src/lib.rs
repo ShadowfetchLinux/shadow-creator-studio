@@ -1,3 +1,13 @@
+//! PipeWire presence and device listing via `pw-dump` (no libpipewire link).
+
+mod dump;
+mod error;
+mod nodes;
+
+pub use dump::{audio_devices_from_nodes, dump_nodes, pw_record_args};
+pub use error::PipewireError;
+pub use nodes::{parse_pw_dump, PwNode};
+
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};

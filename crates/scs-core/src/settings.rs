@@ -80,6 +80,8 @@ pub struct VideoSettings {
     pub width: u32,
     pub height: u32,
     pub fps: u32,
+    pub display_id: Option<String>,
+    pub display_label: Option<String>,
 }
 
 impl Default for VideoSettings {
@@ -88,6 +90,8 @@ impl Default for VideoSettings {
             width: 1920,
             height: 1080,
             fps: 60,
+            display_id: None,
+            display_label: None,
         }
     }
 }
@@ -106,7 +110,9 @@ pub struct AudioSettings {
     pub sample_rate: u32,
     pub processing_preset: AudioProcessingPreset,
     pub mic_device: Option<String>,
+    pub mic_label: Option<String>,
     pub desktop_device: Option<String>,
+    pub desktop_label: Option<String>,
     pub separate_tracks: bool,
 }
 
@@ -116,7 +122,9 @@ impl Default for AudioSettings {
             sample_rate: 48_000,
             processing_preset: AudioProcessingPreset::Natural,
             mic_device: None,
+            mic_label: None,
             desktop_device: None,
+            desktop_label: None,
             separate_tracks: true,
         }
     }
@@ -136,8 +144,11 @@ pub enum AudioProcessingPreset {
 #[serde(default)]
 pub struct CameraSettings {
     pub device: Option<String>,
+    pub label: Option<String>,
     pub width: u32,
     pub height: u32,
+    pub fps: u32,
+    pub pixel_format: Option<String>,
     pub mirror_preview: bool,
 }
 
@@ -145,8 +156,11 @@ impl Default for CameraSettings {
     fn default() -> Self {
         Self {
             device: None,
+            label: None,
             width: 1920,
             height: 1080,
+            fps: 30,
+            pixel_format: None,
             mirror_preview: true,
         }
     }
@@ -338,5 +352,33 @@ mod tests {
         let store = SettingsStore::in_dir(dir.path());
         let loaded = store.load().unwrap();
         assert_eq!(loaded, Settings::recommended());
+    }
+
+    #[test]
+    fn persists_selected_devices_and_labels() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = SettingsStore::in_dir(dir.path());
+        let mut s = Settings::recommended();
+        s.camera.device = Some("/dev/video0".into());
+        s.camera.label = Some("USB Camera".into());
+        s.camera.pixel_format = Some("mjpeg".into());
+        s.camera.fps = 15;
+        s.audio.mic_device = Some("alsa_input.usb-generic".into());
+        s.audio.mic_label = Some("USB Microphone".into());
+        s.audio.desktop_device = Some("alsa_output.speakers.monitor".into());
+        s.audio.desktop_label = Some("Speakers (monitor)".into());
+        s.video.display_id = Some("0".into());
+        s.video.display_label = Some("HDMI-1 · 1920×1080".into());
+        store.save(&s).unwrap();
+        let loaded = store.load().unwrap();
+        assert_eq!(loaded.camera.device.as_deref(), Some("/dev/video0"));
+        assert_eq!(loaded.camera.label.as_deref(), Some("USB Camera"));
+        assert_eq!(loaded.audio.mic_label.as_deref(), Some("USB Microphone"));
+        assert_eq!(
+            loaded.audio.desktop_device.as_deref(),
+            Some("alsa_output.speakers.monitor")
+        );
+        assert_eq!(loaded.video.display_id.as_deref(), Some("0"));
+        assert!(loaded.camera.mirror_preview);
     }
 }

@@ -3,7 +3,7 @@ name = "scs-audio"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Audio device and processing-chain types (implementation starts M4)"
+description = "Audio devices, meters, and processing-chain types"
 
 [dependencies]
 scs-core.workspace = true

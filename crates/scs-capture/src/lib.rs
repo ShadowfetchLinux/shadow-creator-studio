@@ -1,3 +1,17 @@
+//! Capture sources: cameras, displays, and composite layouts.
+
+mod display;
+mod error;
+mod formats;
+mod inventory;
+mod v4l2;
+
+pub use display::{DesktopKind, DesktopOption, DisplaySource};
+pub use error::CaptureError;
+pub use formats::parse_v4l2_list_formats;
+pub use inventory::DeviceInventory;
+pub use v4l2::{enumerate_cameras, enumerate_sysfs, prefer_format, CameraDevice, CameraFormat};
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

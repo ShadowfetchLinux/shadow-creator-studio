@@ -3,10 +3,11 @@ name = "scs-capture"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Capture source types (screen, window, camera)"
+description = "Capture source types, V4L2 camera listing, display models"
 
 [dependencies]
-scs-core.workspace = true
+scs-audio.workspace = true
+scs-pipewire.workspace = true
 serde.workspace = true
 
 [dev-dependencies]
