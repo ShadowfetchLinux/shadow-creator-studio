@@ -168,7 +168,7 @@ Cargo workspace. Small crates, no giant sources.
 | `scs-pipewire` | `pw-dump` parse, mic vs desktop split, `pw-record` argv | **Listing + error mapping**; no libpipewire link |
 | `scs-ffmpeg` | Typed argv builder, remux/record plans, camera preview argv | Record plans include filter_complex pad graphs |
 | `scs-obs` | WebSocket client config + install probe | Probe only; no session |
-| `scs-library` | Recording index types | Types + empty UI page |
+| `scs-library` | Folder index, sidecar metadata, delete confirm | **M5 implemented + tested** |
 | `scs-teleprompter` | Script types | Types + empty UI page |
 | `scs-diagnostics` | Redacted report assembly | **Implemented** |
 | `scs-ui` | GTK4 + libadwaita shell + live preview/meters | **Implemented**; needs `-dev` packages to compile |
@@ -196,7 +196,7 @@ Disabled + labeled. Examples already in the shell:
 | **M2** | Device discovery + live preview | Cameras (name/resolution/FPS), PipeWire mics, desktop monitors, live camera preview + mirror, peak/average meters + clip, persist last devices/mode. **Does not record.** |
 | **M3** | Recording | FFmpeg local MKV for Camera / Voice / Creator, NVENC when listed, timer, stop confirm, optional copy remux (MKV kept). Screen grab and OBS WebSocket still later |
 | **M4** | Audio processing | Separate tracks, mute/volume, FFmpeg chain, presets, calibration |
-| **M5** | Picture | Screen + webcam composition, layouts, preview (still honest about limits) |
+| **M5** | Library + FFmpeg tools | Folder index, sidecar, remux/export/trim/normalize/GIF/thumb |
 | **M6** | Library | Index, markers, remux MKV→MP4 without re-encode, never delete MKV until verified |
 | **M7** | Teleprompter | Script, scroll, readability; optional later caption hook |
 | **M8** | YouTube Live | GO LIVE, keyring-backed stream key, YouTube-friendly encode |

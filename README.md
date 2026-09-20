@@ -5,8 +5,8 @@ tutorials, and voice — with a simple creator-focused interface. The long-term
 engine is OBS Studio (via WebSocket) with FFmpeg + NVIDIA NVENC as the
 tooling and fallback path.
 
-**Milestone 4** records Camera, Voice, and Creator takes with separate audio
-tracks and an in-FFmpeg mic chain. Screen/Presentation and GO LIVE stay unavailable.
+**Milestone 5** adds a recordings library and FFmpeg quick-edit tools. Screen
+and GO LIVE stay unavailable.
 
 ## Screenshots
 
@@ -20,7 +20,7 @@ tracks and an in-FFmpeg mic chain. Screen/Presentation and GO LIVE stay unavaila
 | Diagnostics | ![Diagnostics](docs/screenshots/diagnostics.png) |
 | First-run wizard | ![Wizard](docs/screenshots/wizard.png) |
 
-## What works in Milestone 4
+## What works in Milestone 5
 
 - Everything from Milestone 1 (shell, settings, wizard, diagnostics, dashboard)
 - Camera selector with name, resolution, and pixel format (not raw `/dev/videoN` as the only label)
@@ -36,6 +36,9 @@ tracks and an in-FFmpeg mic chain. Screen/Presentation and GO LIVE stay unavaila
 - Presets: Natural (default, light), Podcast, Broadcast, Quiet Room, Noisy Room, Voice, Raw
 - Calibration from the live peak meter (recommend gain + a light preset)
 - Mic monitoring toggle does **not** create a speaker loopback (feedback-safe)
+- Library page indexes the configured recordings folder (not the whole disk)
+- Play, open folder, rename, remux, export, copy path, delete with confirm
+- Quick edit writes a **new** file: trim, normalize, 720p, compress, extract audio, MP3, WAV, GIF, thumbnail, YouTube-ready MP4
 - Crash-safe **MKV** names like `2026-09-20_YouTube_Record_001.mkv` — never overwrites
 - Hardware encode when FFmpeg lists NVENC (H.264 / HEVC / AV1); otherwise libx264
 - Quality presets: YouTube Standard / High Quality / 4K, Archival, Small File, Custom
@@ -50,7 +53,7 @@ tracks and an in-FFmpeg mic chain. Screen/Presentation and GO LIVE stay unavaila
 | GO LIVE | Available in a later milestone (M8) |
 | Window / region capture | Structured, labeled unavailable |
 | Live desktop frames | Selected-display placeholder (portal capture is later) |
-| Library / Teleprompter | Empty states until later milestones |
+| Teleprompter | Empty state until the next milestone |
 | Mic speaker monitor loop | Not created — use headphones + the desktop mixer |
 
 ## Dependencies

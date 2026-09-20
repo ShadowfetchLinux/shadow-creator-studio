@@ -58,11 +58,12 @@ pub fn start(app: &adw::Application) {
 
     let record = Rc::new(pages::record::RecordPage::new(&state, &window));
     record.connect(&record, &state);
+    let library = pages::library::LibraryPage::new(&state, &window);
     let diagnostics = pages::diagnostics::DiagnosticsPage::new(&state, &window);
     let stack = gtk::Stack::new();
     stack.set_transition_type(gtk::StackTransitionType::Crossfade);
     stack.add_titled(&record.root, Some("record"), "Record");
-    stack.add_titled(&pages::library::build(), Some("library"), "Library");
+    stack.add_titled(&library.root, Some("library"), "Library");
     stack.add_titled(
         &pages::teleprompter::build(),
         Some("teleprompter"),
@@ -76,6 +77,7 @@ pub fn start(app: &adw::Application) {
     stack.add_titled(&diagnostics.root, Some("diagnostics"), "Diagnostics");
 
     let stack_nav = stack.clone();
+    let stack_tick = stack.clone();
     sidebar_list.connect_row_activated(move |_, row| {
         let name = match row.index() {
             0 => "record",
@@ -113,7 +115,7 @@ pub fn start(app: &adw::Application) {
         about.set_version(scs_core::APP_VERSION);
         about.set_developer_name("Shadowfetch");
         about.set_comments(
-            "Milestone 4: separate audio tracks, FFmpeg mic processing, calibration. Screen and GO LIVE stay unavailable.",
+            "Milestone 5: library + FFmpeg tools. Screen and GO LIVE stay unavailable.",
         );
         about.set_license_type(gtk::License::MitX11);
         about.present();
@@ -128,6 +130,7 @@ pub fn start(app: &adw::Application) {
 
     let state_t = Rc::clone(&state);
     let record_t = Rc::clone(&record);
+    let library_t = Rc::clone(&library);
     let discover_rx: Rc<RefCell<Option<Receiver<DeviceInventory>>>> =
         Rc::new(RefCell::new(Some(live::spawn_discover())));
     let ticks = Rc::new(Cell::new(0u32));
@@ -154,6 +157,10 @@ pub fn start(app: &adw::Application) {
         }
 
         record_t.refresh(&state_t, &last_snap.borrow());
+        library_t.pump(&state_t);
+        if n % 200 == 0 && stack_tick.visible_child_name().as_deref() == Some("library") {
+            library_t.reload(&state_t);
+        }
         glib::ControlFlow::Continue
     });
 }

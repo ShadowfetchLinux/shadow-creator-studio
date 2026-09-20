@@ -1,24 +1,9 @@
-use serde::{Deserialize, Serialize};
+pub mod actions;
+pub mod entry;
+pub mod index;
+pub mod sidecar;
 
-use scs_core::RecordingMetadata;
-
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct LibraryIndex {
-    pub recordings: Vec<RecordingMetadata>,
-}
-
-impl LibraryIndex {
-    pub fn is_empty(&self) -> bool {
-        self.recordings.is_empty()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn empty_index() {
-        assert!(LibraryIndex::default().is_empty());
-    }
-}
+pub use actions::{confirm_delete, rename_beside, DeleteRequest};
+pub use entry::LibraryEntry;
+pub use index::{index_folder, LibraryIndex};
+pub use sidecar::{load_sidecar, parse_ffprobe_json, sidecar_path, write_sidecar, Sidecar};

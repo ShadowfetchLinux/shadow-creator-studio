@@ -11,6 +11,7 @@ use scs_ffmpeg::{
     human_ffmpeg_error, parse_progress_block, plan_record, remux_command, verify_media,
     RecordPlanRequest,
 };
+use scs_library::{write_sidecar, Sidecar};
 
 #[derive(Debug)]
 pub enum RecordEvent {
@@ -159,8 +160,24 @@ fn run_session(
             }
         }
     }
+    write_take_sidecar(&mkv, &request);
     let _ = tx.send(RecordEvent::Finished { message, remuxed });
     Ok(())
+}
+
+fn write_take_sidecar(mkv: &PathBuf, request: &RecordPlanRequest) {
+    let mut side = Sidecar {
+        title: mkv.file_stem().map(|s| s.to_string_lossy().into_owned()),
+        video_codec: Some(request.encoder.ffmpeg_name().into()),
+        audio_codec: Some("aac".into()),
+        ..Sidecar::default()
+    };
+    if let Some(cam) = &request.camera {
+        side.width = Some(cam.width);
+        side.height = Some(cam.height);
+        side.fps = Some(cam.fps as f32);
+    }
+    let _ = write_sidecar(mkv, &side);
 }
 
 fn remux_take(mkv: &PathBuf) -> Result<PathBuf, String> {
