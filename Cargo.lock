@@ -919,6 +919,7 @@ dependencies = [
 name = "scs-ffmpeg"
 version = "0.1.0"
 dependencies = [
+ "scs-audio",
  "scs-core",
  "scs-encoder",
 ]
@@ -927,9 +928,11 @@ dependencies = [
 name = "scs-library"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "scs-core",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

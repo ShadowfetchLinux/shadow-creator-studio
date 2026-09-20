@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use scs_audio::{build_filter_graph, AudioChain, TrackLayout};
 use scs_core::RecordingMode;
 use scs_encoder::{EncodeTune, VideoEncoder};
 
@@ -14,7 +15,7 @@ pub struct CameraInput {
     pub fps: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RecordPlanRequest {
     pub mode: RecordingMode,
     pub camera: Option<CameraInput>,
@@ -23,6 +24,8 @@ pub struct RecordPlanRequest {
     pub encoder: VideoEncoder,
     pub tune: EncodeTune,
     pub output: PathBuf,
+    pub layout: TrackLayout,
+    pub chain: AudioChain,
 }
 
 pub fn plan_record(request: &RecordPlanRequest) -> Result<PlannedCommand, String> {
@@ -53,6 +56,7 @@ fn plan_voice(request: &RecordPlanRequest) -> Result<PlannedCommand, String> {
         .arg("pipe:1")
         .never_overwrite();
     b = pulse_input(b, mic);
+    b = apply_audio_graph(b, request, 0, None, None);
     b = encode_audio(b);
     Ok(b.arg("-f").arg("matroska").output(&request.output).build())
 }
@@ -81,18 +85,51 @@ fn plan_camera(request: &RecordPlanRequest) -> Result<PlannedCommand, String> {
         .arg("+genpts");
     b = v4l2_input(b, camera);
     b = pulse_input(b, mic);
+    let mut next = 2usize;
+    let mut desk_idx = None;
+    let mut music_idx = None;
     if include_desktop {
         if let Some(desktop) = request.desktop.as_deref() {
             b = pulse_input(b, desktop);
+            desk_idx = Some(next);
+            next += 1;
+        }
+    }
+    if request.layout.music.audible() {
+        if let Some(music) = request.layout.music.source.as_deref() {
+            b = pulse_input(b, music);
+            music_idx = Some(next);
         }
     }
     b = encode_video(b, request.encoder, &request.tune, camera);
     b = encode_audio(b);
-    b = b.map_stream("0:v").map_stream("1:a");
-    if include_desktop {
-        b = b.map_stream("2:a");
-    }
+    b = b.map_stream("0:v");
+    b = apply_audio_graph(b, request, 1, desk_idx, music_idx);
     Ok(b.arg("-f").arg("matroska").output(&request.output).build())
+}
+
+fn apply_audio_graph(
+    mut builder: FfmpegCommandBuilder,
+    request: &RecordPlanRequest,
+    mic_index: usize,
+    desktop_index: Option<usize>,
+    music_index: Option<usize>,
+) -> FfmpegCommandBuilder {
+    if let Some(graph) = build_filter_graph(
+        &request.chain,
+        &request.layout,
+        Some(mic_index),
+        desktop_index,
+        music_index,
+    ) {
+        builder = builder.arg("-filter_complex").arg(&graph.graph);
+        for map in graph.maps {
+            builder = builder.map_stream(&map);
+        }
+        builder
+    } else {
+        builder.map_stream(&format!("{mic_index}:a"))
+    }
 }
 
 fn v4l2_input(builder: FfmpegCommandBuilder, camera: &CameraInput) -> FfmpegCommandBuilder {
@@ -179,6 +216,7 @@ pub fn sidecar_path(mkv: impl AsRef<Path>) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use scs_audio::{AudioChain, TrackLayout};
     use scs_encoder::tune_for;
     use std::path::PathBuf;
 
@@ -201,6 +239,12 @@ mod tests {
             encoder: VideoEncoder::H264Nvenc,
             tune: tune_for(scs_core::QualityPreset::Youtube1080p60, VideoEncoder::H264Nvenc),
             output: PathBuf::from("/tmp/out;rm.mkv"),
+            layout: TrackLayout::default().with_sources(
+                Some("alsa_input.usb;evil".into()),
+                desktop.map(ToOwned::to_owned),
+                None,
+            ),
+            chain: AudioChain::natural(),
         }
     }
 
@@ -221,7 +265,7 @@ mod tests {
         assert!(args.contains(&"-n".into()));
         assert!(args.contains(&"matroska".into()));
         assert!(!args.iter().any(|a| *a == "rm"));
-        assert!(!args.iter().any(|a| a.contains("2:a")));
+        assert!(args.iter().any(|a| a.contains("filter_complex") || a.contains("[mic]")));
     }
 
     #[test]
@@ -232,8 +276,9 @@ mod tests {
         ))
         .unwrap();
         let args = args(&cmd);
-        assert!(args.windows(2).any(|w| w[0] == "-map" && w[1] == "2:a"));
+        assert!(args.iter().any(|a| a.contains("[desk]") || a.contains("[mix]")));
         assert!(args.contains(&"alsa_output.speakers.monitor".into()));
+        assert!(args.windows(2).any(|w| w[0] == "-filter_complex"));
     }
 
     #[test]

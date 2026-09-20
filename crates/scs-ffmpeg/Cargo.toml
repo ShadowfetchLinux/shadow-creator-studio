@@ -6,5 +6,6 @@ license.workspace = true
 description = "Typed FFmpeg command builder (never shell-interpolated)"
 
 [dependencies]
+scs-audio.workspace = true
 scs-core.workspace = true
 scs-encoder.workspace = true

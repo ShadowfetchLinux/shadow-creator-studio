@@ -113,7 +113,20 @@ pub struct AudioSettings {
     pub mic_label: Option<String>,
     pub desktop_device: Option<String>,
     pub desktop_label: Option<String>,
+    pub music_device: Option<String>,
+    pub music_label: Option<String>,
     pub separate_tracks: bool,
+    pub include_mixed: bool,
+    pub include_mic: bool,
+    pub include_desktop: bool,
+    pub include_music: bool,
+    pub mic_muted: bool,
+    pub desktop_muted: bool,
+    pub music_muted: bool,
+    pub mic_volume: f32,
+    pub desktop_volume: f32,
+    pub music_volume: f32,
+    pub monitor_enabled: bool,
 }
 
 impl Default for AudioSettings {
@@ -125,7 +138,20 @@ impl Default for AudioSettings {
             mic_label: None,
             desktop_device: None,
             desktop_label: None,
+            music_device: None,
+            music_label: None,
             separate_tracks: true,
+            include_mixed: true,
+            include_mic: true,
+            include_desktop: true,
+            include_music: false,
+            mic_muted: false,
+            desktop_muted: false,
+            music_muted: false,
+            mic_volume: 1.0,
+            desktop_volume: 1.0,
+            music_volume: 1.0,
+            monitor_enabled: false,
         }
     }
 }
@@ -138,6 +164,33 @@ pub enum AudioProcessingPreset {
     Natural,
     Voice,
     Podcast,
+    Broadcast,
+    QuietRoom,
+    NoisyRoom,
+}
+
+impl AudioProcessingPreset {
+    pub const ALL: [AudioProcessingPreset; 7] = [
+        AudioProcessingPreset::Natural,
+        AudioProcessingPreset::Podcast,
+        AudioProcessingPreset::Broadcast,
+        AudioProcessingPreset::QuietRoom,
+        AudioProcessingPreset::NoisyRoom,
+        AudioProcessingPreset::Voice,
+        AudioProcessingPreset::Raw,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Natural => "Natural (light)",
+            Self::Podcast => "Podcast",
+            Self::Broadcast => "Broadcast",
+            Self::QuietRoom => "Quiet Room",
+            Self::NoisyRoom => "Noisy Room",
+            Self::Voice => "Voice",
+            Self::Raw => "Raw",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

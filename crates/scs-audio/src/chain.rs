@@ -143,6 +143,28 @@ impl AudioChain {
                 chain.noise_suppression.strength = 0.35;
                 chain
             }
+            AudioProcessingPreset::Broadcast => {
+                let mut chain = Self::natural();
+                chain.preset = preset;
+                chain.compressor.ratio = 3.0;
+                chain.limiter.ceiling_db = -1.5;
+                chain
+            }
+            AudioProcessingPreset::QuietRoom => {
+                let mut chain = Self::natural();
+                chain.preset = preset;
+                chain.noise_suppression.enabled = false;
+                chain.gate.enabled = false;
+                chain
+            }
+            AudioProcessingPreset::NoisyRoom => {
+                let mut chain = Self::natural();
+                chain.preset = preset;
+                chain.noise_suppression.strength = 0.45;
+                chain.gate.enabled = true;
+                chain.gate.threshold_db = -42.0;
+                chain
+            }
         }
     }
 }
@@ -160,6 +182,11 @@ mod tests {
         let raw = AudioChain::raw();
         assert!(!raw.high_pass.enabled);
         assert!(!raw.limiter.enabled);
+        let noisy = AudioChain::for_preset(AudioProcessingPreset::NoisyRoom);
+        assert!(noisy.gate.enabled);
+        assert!(noisy.noise_suppression.strength <= 0.5);
+        let quiet = AudioChain::for_preset(AudioProcessingPreset::QuietRoom);
+        assert!(!quiet.noise_suppression.enabled);
     }
 
     #[test]

@@ -72,37 +72,34 @@ fn audio_group(state: &Rc<StudioState>) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::new();
     group.set_title("Audio");
     group.set_description(Some(
-        "Processing is modeled only. The chain is applied in Milestone 4. System mic config is never rewritten.",
+        "HPF → denoise → gate → EQ → compressor → limiter on the mic, inside FFmpeg. Natural is light. EasyEffects is never written.",
     ));
 
-    let model = gtk::StringList::new(&["Natural (light)", "Raw", "Voice", "Podcast"]);
+    let labels: Vec<&str> = AudioProcessingPreset::ALL.iter().map(|p| p.label()).collect();
+    let model = gtk::StringList::new(&labels);
     let combo = adw::ComboRow::builder()
         .title("Processing preset")
-        .subtitle("Natural is the recommended default")
+        .subtitle("Default is Natural (light), not aggressive")
         .model(&model)
         .build();
-    combo.set_selected(match state.settings.borrow().audio.processing_preset {
-        AudioProcessingPreset::Natural => 0,
-        AudioProcessingPreset::Raw => 1,
-        AudioProcessingPreset::Voice => 2,
-        AudioProcessingPreset::Podcast => 3,
-    });
+    let current = state.settings.borrow().audio.processing_preset;
+    let idx = AudioProcessingPreset::ALL
+        .iter()
+        .position(|p| *p == current)
+        .unwrap_or(0);
+    combo.set_selected(idx as u32);
     let state_c = Rc::clone(state);
     combo.connect_selected_notify(move |row| {
-        let preset = match row.selected() {
-            1 => AudioProcessingPreset::Raw,
-            2 => AudioProcessingPreset::Voice,
-            3 => AudioProcessingPreset::Podcast,
-            _ => AudioProcessingPreset::Natural,
-        };
-        state_c.settings.borrow_mut().audio.processing_preset = preset;
-        let _ = state_c.persist();
+        if let Some(preset) = AudioProcessingPreset::ALL.get(row.selected() as usize) {
+            state_c.settings.borrow_mut().audio.processing_preset = *preset;
+            let _ = state_c.persist();
+        }
     });
     group.add(&combo);
 
     let tracks = adw::SwitchRow::builder()
-        .title("Separate mic and desktop tracks")
-        .subtitle("Planned for recording. Saved now, used in M3+.")
+        .title("Separate source tracks")
+        .subtitle("Writes mixed + mic + desktop (+ music) when those buses are on")
         .active(state.settings.borrow().audio.separate_tracks)
         .build();
     let state_t = Rc::clone(state);

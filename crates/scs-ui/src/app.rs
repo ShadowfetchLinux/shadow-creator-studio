@@ -113,7 +113,7 @@ pub fn start(app: &adw::Application) {
         about.set_version(scs_core::APP_VERSION);
         about.set_developer_name("Shadowfetch");
         about.set_comments(
-            "Milestone 3: local MKV recording for Camera, Voice, and Creator. Live streaming is not implemented yet.",
+            "Milestone 4: separate audio tracks, FFmpeg mic processing, calibration. Screen and GO LIVE stay unavailable.",
         );
         about.set_license_type(gtk::License::MitX11);
         about.present();

@@ -5,8 +5,8 @@ tutorials, and voice — with a simple creator-focused interface. The long-term
 engine is OBS Studio (via WebSocket) with FFmpeg + NVIDIA NVENC as the
 tooling and fallback path.
 
-**Milestone 3** records Camera, Voice, and Creator takes to a crash-safe MKV.
-Screen/Presentation and GO LIVE stay unavailable.
+**Milestone 4** records Camera, Voice, and Creator takes with separate audio
+tracks and an in-FFmpeg mic chain. Screen/Presentation and GO LIVE stay unavailable.
 
 ## Screenshots
 
@@ -20,7 +20,7 @@ Screen/Presentation and GO LIVE stay unavailable.
 | Diagnostics | ![Diagnostics](docs/screenshots/diagnostics.png) |
 | First-run wizard | ![Wizard](docs/screenshots/wizard.png) |
 
-## What works in Milestone 3
+## What works in Milestone 4
 
 - Everything from Milestone 1 (shell, settings, wizard, diagnostics, dashboard)
 - Camera selector with name, resolution, and pixel format (not raw `/dev/videoN` as the only label)
@@ -30,7 +30,12 @@ Screen/Presentation and GO LIVE stay unavailable.
 - Multi-monitor display tiles from the session; window and region capture stay labeled unavailable
 - Last camera, mic, desktop source, display, and recording mode persist in settings
 - Background discovery — the UI does not freeze while probing devices
-- **START RECORDING** for Camera (cam+mic), Voice (mic), and Creator (cam+mic, desktop as a second AAC track when a monitor is selected)
+- **START RECORDING** for Camera (cam+mic), Voice (mic), and Creator (cam+mic+desktop)
+- Separate tracks: mixed + mic + desktop + optional music, each with mute and volume
+- Mic chain in FFmpeg: HPF → `afftdn` → gate → EQ → compressor → limiter
+- Presets: Natural (default, light), Podcast, Broadcast, Quiet Room, Noisy Room, Voice, Raw
+- Calibration from the live peak meter (recommend gain + a light preset)
+- Mic monitoring toggle does **not** create a speaker loopback (feedback-safe)
 - Crash-safe **MKV** names like `2026-09-20_YouTube_Record_001.mkv` — never overwrites
 - Hardware encode when FFmpeg lists NVENC (H.264 / HEVC / AV1); otherwise libx264
 - Quality presets: YouTube Standard / High Quality / 4K, Archival, Small File, Custom
@@ -45,7 +50,8 @@ Screen/Presentation and GO LIVE stay unavailable.
 | GO LIVE | Available in a later milestone (M8) |
 | Window / region capture | Structured, labeled unavailable |
 | Live desktop frames | Selected-display placeholder (portal capture is later) |
-| Library / Teleprompter | Empty states for M6 / M7 |
+| Library / Teleprompter | Empty states until later milestones |
+| Mic speaker monitor loop | Not created — use headphones + the desktop mixer |
 
 ## Dependencies
 
@@ -111,7 +117,7 @@ $XDG_VIDEOS_DIR/Shadow Creator Studio
 
 - Target container: **MKV** (crash-safe). Optional remux to MP4 without re-encode
   starts in M6. The MKV is never deleted until the MP4 verifies.
-- Creator muxes mic and desktop as **separate AAC tracks** when a desktop monitor is selected. Processing still arrives in M4.
+- Creator muxes mixed / mic / desktop / optional music as configured. Filter graphs use pad labels only.
 - Preferred future encoder: **NVIDIA NVENC** (`h264_nvenc`, plus HEVC/AV1 when
   FFmpeg lists them).
 - Primary future record engine: **OBS via obs-websocket**. FFmpeg is remux /
@@ -120,8 +126,8 @@ $XDG_VIDEOS_DIR/Shadow Creator Studio
 ## Audio
 
 - PipeWire is the native path. `pactl` showing “PulseAudio (on PipeWire)” is normal.
-- Planned chain (M4): Mic → high-pass → noise suppression → gate → EQ →
-  compressor → limiter. Default **Natural** (light), plus **Raw**.
+- Mic chain (M4): high-pass → `afftdn` denoise → gate → EQ → compressor →
+  limiter. Default **Natural** (light). Not written into EasyEffects or WirePlumber.
 - EasyEffects is compatible in concept and optional. Shadow Creator Studio will
   not silently change system mic routing.
 
@@ -132,7 +138,7 @@ GPU load, VRAM, and temperature through NVML when initialization succeeds. It
 does not spawn `nvidia-smi` every tick. While recording, the status chip shows
 the FFmpeg encoder actually in use.
 
-## Known limitations (M3)
+## Known limitations (M4)
 
 - Screen and Presentation do **not** record. Portal / desktop grab is later.
 - GO LIVE stays disabled.

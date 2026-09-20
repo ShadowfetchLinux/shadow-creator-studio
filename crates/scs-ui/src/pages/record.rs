@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
@@ -16,7 +16,7 @@ use crate::live::plan;
 use crate::live::preview::{self as preview_live, PreviewEvent};
 use crate::live::record::{self as rec_live, RecordEvent};
 use crate::state::StudioState;
-use crate::widgets::{dashboard, meters, mode_tiles, preview, sources, status_strip};
+use crate::widgets::{dashboard, meters, mode_tiles, preview, sources, status_strip, tracks};
 use scs_core::stop_requires_confirmation;
 
 pub struct RecordPage {
@@ -34,6 +34,8 @@ pub struct RecordPage {
     rec_note: gtk::Label,
     rec_stop: RefCell<Option<Arc<AtomicBool>>>,
     rec_rx: RefCell<Option<Receiver<RecordEvent>>>,
+    tracks: tracks::TrackMixer,
+    last_mic_peak: Cell<f32>,
 }
 
 struct LiveSessions {
@@ -80,6 +82,7 @@ impl RecordPage {
         let sources = sources::SourceSelector::build(state);
         let preview = preview::PreviewView::build();
         let meters = meters::build();
+        let tracks = tracks::TrackMixer::build(state);
         let status = status_strip::StatusStrip::build();
 
         let mirror = gtk::CheckButton::with_label("Mirror camera preview");
@@ -133,6 +136,7 @@ impl RecordPage {
         column.append(&preview.root);
         column.append(&mirror);
         column.append(&meters.root);
+        column.append(&tracks.root);
         column.append(&status.root);
         column.append(&rec);
         column.append(&rec_note);
@@ -159,6 +163,8 @@ impl RecordPage {
             rec_note,
             rec_stop: RefCell::new(None),
             rec_rx: RefCell::new(None),
+            tracks,
+            last_mic_peak: Cell::new(-90.0),
         }
     }
 
@@ -168,7 +174,29 @@ impl RecordPage {
         self.rec_btn.connect_clicked(move |_| {
             page_c.on_record_clicked(&state_c);
         });
+        let page_k = Rc::clone(page);
+        let state_k = Rc::clone(state);
+        self.tracks.calibrate.connect_clicked(move |_| {
+            page_k.calibrate_mic(&state_k);
+        });
         self.refresh_record_chrome(state);
+    }
+
+    fn calibrate_mic(&self, state: &Rc<StudioState>) {
+        let peak = self.last_mic_peak.get();
+        let advice = scs_audio::recommend_from_peak(peak);
+        {
+            let mut settings = state.settings.borrow_mut();
+            settings.audio.mic_volume = advice.recommended_volume;
+            settings.audio.processing_preset = advice.suggested_preset;
+        }
+        let _ = state.persist();
+        self.tracks.show_advice(&format!(
+            "Peak {peak:+.1} dB → volume {:.2} · {} — {}",
+            advice.recommended_volume,
+            advice.suggested_preset.label(),
+            advice.note
+        ));
     }
 
     pub fn apply_inventory(&self, inventory: DeviceInventory, state: &Rc<StudioState>) {
@@ -572,7 +600,10 @@ impl RecordPage {
             }
         }
         match mic_event {
-            Some(MeterEvent::Levels(levels)) => self.meters.mic.set_levels(levels, &mic_label),
+            Some(MeterEvent::Levels(levels)) => {
+                self.last_mic_peak.set(levels.peak_db);
+                self.meters.mic.set_levels(levels, &mic_label);
+            }
             Some(MeterEvent::Error(err)) => self.meters.mic.set_error(&err),
             None => {}
         }

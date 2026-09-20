@@ -161,12 +161,12 @@ Cargo workspace. Small crates, no giant sources.
 | --- | --- | --- |
 | `scs-core` | Settings (XDG JSON), paths, filenames, recording metadata, markers, disk math, config migration, secret redaction | **Implemented + tested** |
 | `scs-system` | Cheap host probes: `/proc`, NVML, `statvfs`, hwmon | **Implemented** (live where cheap) |
-| `scs-audio` | Device types, peak/average meters, processing-chain model | **Meters implemented + tested**; processing still M4 |
+| `scs-audio` | Devices, meters, track layout, FFmpeg filter graph, calibration | **M4 implemented + tested** |
 | `scs-video` | Resolution, FPS, color, format types | Types only |
 | `scs-capture` | V4L2 camera listing, display models, inventory | **Cameras + inventory**; window/region unavailable |
 | `scs-encoder` | Encoder capability parsing | Parser + types; detection optional |
 | `scs-pipewire` | `pw-dump` parse, mic vs desktop split, `pw-record` argv | **Listing + error mapping**; no libpipewire link |
-| `scs-ffmpeg` | Typed argv builder, remux/record plans, camera preview argv | Builder + preview plan; does not spawn a recorder |
+| `scs-ffmpeg` | Typed argv builder, remux/record plans, camera preview argv | Record plans include filter_complex pad graphs |
 | `scs-obs` | WebSocket client config + install probe | Probe only; no session |
 | `scs-library` | Recording index types | Types + empty UI page |
 | `scs-teleprompter` | Script types | Types + empty UI page |
@@ -195,7 +195,7 @@ Disabled + labeled. Examples already in the shell:
 | **M1** | Application shell | This milestone. Window, navigation, Record page chrome, mode tiles (persisted), Settings structure + restore defaults, Diagnostics (real probes + copy redacted report), first-run wizard shell, system dashboard (cheap live metrics), foundation libraries + tests. **Does not record.** |
 | **M2** | Device discovery + live preview | Cameras (name/resolution/FPS), PipeWire mics, desktop monitors, live camera preview + mirror, peak/average meters + clip, persist last devices/mode. **Does not record.** |
 | **M3** | Recording | FFmpeg local MKV for Camera / Voice / Creator, NVENC when listed, timer, stop confirm, optional copy remux (MKV kept). Screen grab and OBS WebSocket still later |
-| **M4** | Audio processing | HPF → denoise → gate → EQ → compressor → limiter; Natural vs Raw |
+| **M4** | Audio processing | Separate tracks, mute/volume, FFmpeg chain, presets, calibration |
 | **M5** | Picture | Screen + webcam composition, layouts, preview (still honest about limits) |
 | **M6** | Library | Index, markers, remux MKV→MP4 without re-encode, never delete MKV until verified |
 | **M7** | Teleprompter | Script, scroll, readability; optional later caption hook |

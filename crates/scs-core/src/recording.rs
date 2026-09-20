@@ -39,6 +39,7 @@ pub enum AudioTrackRole {
     Microphone,
     Desktop,
     Mixed,
+    Music,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

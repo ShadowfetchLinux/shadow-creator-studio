@@ -13,10 +13,12 @@ pub struct SourceSelector {
     displays: gtk::Box,
     mic: gtk::DropDown,
     desktop: gtk::DropDown,
+    music: gtk::DropDown,
     camera_ids: Rc<RefCell<Vec<String>>>,
     display_ids: Rc<RefCell<Vec<String>>>,
     mic_ids: Rc<RefCell<Vec<String>>>,
     desk_ids: Rc<RefCell<Vec<String>>>,
+    music_ids: Rc<RefCell<Vec<String>>>,
     suppress: Rc<Cell<bool>>,
 }
 
@@ -47,10 +49,12 @@ impl SourceSelector {
 
         let (mic_wrap, mic, mic_ids) = labeled_dropdown("Microphone");
         let (desk_wrap, desktop, desk_ids) = labeled_dropdown("Desktop audio");
+        let (music_wrap, music, music_ids) = labeled_dropdown("App / music (optional)");
         let audio_row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         audio_row.set_homogeneous(true);
         audio_row.append(&mic_wrap);
         audio_row.append(&desk_wrap);
+        audio_row.append(&music_wrap);
 
         let suppress = Rc::new(Cell::new(false));
         bind_audio_dropdown(
@@ -65,6 +69,13 @@ impl SourceSelector {
             &desk_ids,
             Rc::clone(state),
             AudioKind::Desktop,
+            Rc::clone(&suppress),
+        );
+        bind_audio_dropdown(
+            &music,
+            &music_ids,
+            Rc::clone(state),
+            AudioKind::Music,
             Rc::clone(&suppress),
         );
 
@@ -82,10 +93,12 @@ impl SourceSelector {
             displays,
             mic,
             desktop,
+            music,
             camera_ids: Rc::new(RefCell::new(Vec::new())),
             display_ids: Rc::new(RefCell::new(Vec::new())),
             mic_ids,
             desk_ids,
+            music_ids,
             suppress,
         }
     }
@@ -224,6 +237,7 @@ impl SourceSelector {
     ) {
         let mic_sel = state.settings.borrow().audio.mic_device.clone();
         let desk_sel = state.settings.borrow().audio.desktop_device.clone();
+        let music_sel = state.settings.borrow().audio.music_device.clone();
         fill_dropdown(
             &self.mic,
             &self.mic_ids,
@@ -238,6 +252,13 @@ impl SourceSelector {
             desk_sel.as_deref(),
             &self.suppress,
         );
+        fill_dropdown(
+            &self.music,
+            &self.music_ids,
+            desktop,
+            music_sel.as_deref(),
+            &self.suppress,
+        );
     }
 }
 
@@ -245,6 +266,7 @@ impl SourceSelector {
 enum AudioKind {
     Mic,
     Desktop,
+    Music,
 }
 
 fn bind_audio_dropdown(
@@ -279,6 +301,10 @@ fn bind_audio_dropdown(
                 AudioKind::Desktop => {
                     settings.audio.desktop_device = Some(id);
                     settings.audio.desktop_label = label;
+                }
+                AudioKind::Music => {
+                    settings.audio.music_device = Some(id);
+                    settings.audio.music_label = label;
                 }
             }
         }

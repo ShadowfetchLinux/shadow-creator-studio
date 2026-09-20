@@ -115,5 +115,5 @@ fn probe_encoders() -> (EncoderCapabilities, String) {
 }
 
 pub fn app_subtitle() -> String {
-    format!("{APP_NAME} · Milestone 3")
+    format!("{APP_NAME} · Milestone 4")
 }

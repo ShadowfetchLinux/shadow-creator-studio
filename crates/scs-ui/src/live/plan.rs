@@ -1,4 +1,5 @@
 use chrono::Local;
+use scs_audio::{AudioChain, TrackLayout};
 use scs_capture::{CameraDevice, DeviceInventory};
 use scs_core::filenames::next_recording_path;
 use scs_core::{DiskSpace, RecordingMode};
@@ -58,6 +59,8 @@ pub fn build_request(
         RecordingMode::Creator | RecordingMode::Custom => settings.audio.desktop_device.clone(),
         _ => None,
     };
+    let layout = TrackLayout::from_settings(&settings.audio);
+    let chain = AudioChain::for_preset(settings.audio.processing_preset);
     drop(settings);
     Ok(RecordPlanRequest {
         mode,
@@ -67,6 +70,8 @@ pub fn build_request(
         encoder,
         tune,
         output,
+        layout,
+        chain,
     })
 }
 
