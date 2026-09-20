@@ -258,10 +258,11 @@ fn load_css() {
     let provider = gtk::CssProvider::new();
     provider.load_from_string(include_str!("style.css"));
     if let Some(display) = gtk::gdk::Display::default() {
+        // Beat desktop-generated user gtk.css that redefines Adwaita tokens as light.
         gtk::style_context_add_provider_for_display(
             &display,
             &provider,
-            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            gtk::STYLE_PROVIDER_PRIORITY_USER + 1,
         );
     }
 }
