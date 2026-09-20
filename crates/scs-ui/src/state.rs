@@ -134,5 +134,5 @@ fn probe_muxers() -> String {
 }
 
 pub fn app_subtitle() -> String {
-    format!("{APP_NAME} · Milestone 7")
+    format!("{APP_NAME} · Milestone 8")
 }

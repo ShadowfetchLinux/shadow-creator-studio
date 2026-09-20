@@ -17,6 +17,10 @@ pub fn run_tool(job: ToolJob) -> Receiver<JobEvent> {
     spawn_cmd(job.command, Some(job.output))
 }
 
+pub fn run_tool_cmd(command: PlannedCommand) -> Receiver<JobEvent> {
+    spawn_cmd(command, None)
+}
+
 fn spawn_cmd(command: PlannedCommand, output: Option<PathBuf>) -> Receiver<JobEvent> {
     let (tx, rx) = mpsc::channel();
     thread::Builder::new()

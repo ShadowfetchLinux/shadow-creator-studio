@@ -98,7 +98,26 @@ impl LibraryPage {
         column.append(&scroll);
         column.append(&detail);
         column.append(&actions);
+        let ext_label = gtk::Label::new(Some("Creator extensions"));
+        ext_label.add_css_class("heading");
+        ext_label.set_halign(gtk::Align::Start);
+        let ext_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let mut ext_buttons = Vec::new();
+        for ext in scs_core::registry() {
+            let btn = gtk::Button::with_label(ext.label);
+            btn.set_sensitive(ext.available);
+            if let Some(reason) = ext.reason {
+                btn.set_tooltip_text(Some(reason));
+            } else {
+                btn.set_tooltip_text(Some("Runs a local FFmpeg/sidecar job on the selected take."));
+            }
+            ext_buttons.push((btn.clone(), ext.id));
+            ext_row.append(&btn);
+        }
+
         column.append(&tools);
+        column.append(&ext_label);
+        column.append(&ext_row);
         column.append(&status);
 
         let root = gtk::ScrolledWindow::new();
@@ -138,8 +157,45 @@ impl LibraryPage {
             }
         });
 
+        for (btn, id) in ext_buttons {
+            let page_e = Rc::clone(&page);
+            btn.connect_clicked(move |_| {
+                if let Err(err) = page_e.run_extension(id) {
+                    page_e.status.set_text(&err);
+                }
+            });
+        }
+
         page.reload(state);
         page
+    }
+
+    fn run_extension(&self, id: scs_core::ExtensionId) -> Result<(), String> {
+        let entry = self.current().ok_or_else(|| "Select a take first.".to_string())?;
+        match id {
+            scs_core::ExtensionId::Thumbnail => {
+                *self.job_rx.borrow_mut() = Some(jobs::run_tool(thumbnail(&entry.path, 1.0)));
+                self.status.set_text("Writing a thumbnail…");
+            }
+            scs_core::ExtensionId::Scale9x16 => {
+                *self.job_rx.borrow_mut() = Some(jobs::run_tool(scs_ffmpeg::scale_9x16(&entry.path)));
+                self.status.set_text("Scaling to 9:16…");
+            }
+            scs_core::ExtensionId::ChaptersFromMarkers => {
+                let side = scs_core::MarkerFile::path_for(&entry.path);
+                let file = scs_core::MarkerFile::load(&side)?;
+                let dest = entry.path.with_extension("chapters.vtt");
+                scs_core::chapters_from_markers(&file, &dest)?;
+                self.status.set_text(&format!("Wrote {}", dest.display()));
+            }
+            scs_core::ExtensionId::SilenceDetect => {
+                *self.job_rx.borrow_mut() =
+                    Some(jobs::run_tool_cmd(scs_ffmpeg::silence_detect_args(&entry.path)));
+                self.status.set_text("Scanning for silence…");
+            }
+            _ => return Err("That extension is not implemented locally.".into()),
+        }
+        Ok(())
     }
 
     pub fn reload(&self, state: &StudioState) {

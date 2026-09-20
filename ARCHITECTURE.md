@@ -159,7 +159,7 @@ Cargo workspace. Small crates, no giant sources.
 
 | Crate | Role | Current reality |
 | --- | --- | --- |
-| `scs-core` | Settings (XDG JSON), paths, filenames, recording metadata, markers, disk math, config migration, secret redaction | **Implemented + tested** |
+| `scs-core` | Settings, paths, filenames, markers, secrets, extension registry, local jobs | **M8 registry + local jobs tested** |
 | `scs-system` | Cheap host probes: `/proc`, NVML, `statvfs`, hwmon | **Implemented** (live where cheap) |
 | `scs-audio` | Devices, meters, track layout, FFmpeg filter graph, calibration | **M4 implemented + tested** |
 | `scs-video` | Resolution, FPS, color, format types | Types only |

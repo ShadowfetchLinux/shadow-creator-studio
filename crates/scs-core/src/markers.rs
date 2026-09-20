@@ -58,6 +58,13 @@ impl MarkerFile {
         std::fs::write(path.as_ref(), json).map_err(|e| e.to_string())
     }
 
+    pub fn load(path: impl AsRef<std::path::Path>) -> Result<Self, String> {
+        let raw = std::fs::read_to_string(path.as_ref()).map_err(|_| {
+            "No markers sidecar for this take.".to_string()
+        })?;
+        serde_json::from_str(&raw).map_err(|e| e.to_string())
+    }
+
     pub fn chapter_vtt(&self) -> String {
         let mut out = String::from("WEBVTT\n\n");
         for (i, marker) in self.markers.iter().enumerate() {

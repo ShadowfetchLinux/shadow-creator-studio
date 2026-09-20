@@ -5,8 +5,8 @@ tutorials, and voice — with a simple creator-focused interface. The long-term
 engine is OBS Studio (via WebSocket) with FFmpeg + NVIDIA NVENC as the
 tooling and fallback path.
 
-**Milestone 7** adds RTMP/RTMPS architecture and keyring-backed stream keys.
-GO LIVE enables only after a key is stored and FFmpeg lists an flv muxer.
+**Milestone 8** ships local creator extensions. Cloud AI and YouTube OAuth stay
+disabled tiles. GO LIVE still requires a stored key and an flv probe.
 
 ## Screenshots
 
@@ -42,6 +42,8 @@ GO LIVE enables only after a key is stored and FFmpeg lists an flv muxer.
 - Teleprompter: paste script, font size, scroll speed, pause, mirrored, overlay window
 - In-app hotkeys (F9 start/stop, F8 marker, F7 mute, F6 camera, F5 teleprompter)
 - Markers write `*.markers.json` beside the take for later chapters
+- Local extensions: thumbnail, chapters-from-markers, 9:16 scale/pad, silencedetect
+- Disabled tiles: Whisper, captions, highlights, Shorts, AI title, YouTube upload
 - Crash-safe **MKV** names like `2026-09-20_YouTube_Record_001.mkv` — never overwrites
 - Hardware encode when FFmpeg lists NVENC (H.264 / HEVC / AV1); otherwise libx264
 - Quality presets: YouTube Standard / High Quality / 4K, Archival, Small File, Custom

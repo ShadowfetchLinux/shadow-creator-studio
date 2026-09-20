@@ -114,7 +114,7 @@ pub fn start(app: &adw::Application) {
         about.set_version(scs_core::APP_VERSION);
         about.set_developer_name("Shadowfetch");
         about.set_comments(
-            "Milestone 7: RTMP architecture and keyring-backed keys. GO LIVE stays off until a key is stored and the flv probe passes.",
+            "Milestone 8: local extensions (thumbnail, chapters, 9:16, silence). Cloud AI tiles stay disabled.",
         );
         about.set_license_type(gtk::License::MitX11);
         about.present();
