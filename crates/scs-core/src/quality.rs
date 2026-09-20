@@ -30,12 +30,12 @@ impl QualityPreset {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::Youtube1080p60 => "YouTube 1080p60",
-            Self::Youtube1080p30 => "YouTube 1080p30",
+            Self::Youtube1080p60 => "YouTube High Quality",
+            Self::Youtube1080p30 => "YouTube Standard",
             Self::Youtube1440p60 => "YouTube 1440p60",
-            Self::Youtube4k30 => "YouTube 4K30",
-            Self::High => "High",
-            Self::Balanced => "Balanced",
+            Self::Youtube4k30 => "YouTube 4K",
+            Self::High => "Archival",
+            Self::Balanced => "Small File",
             Self::Custom => "Custom",
         }
     }

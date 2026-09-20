@@ -970,6 +970,7 @@ dependencies = [
 name = "scs-ui"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "glib",
  "gtk4",
  "libadwaita",

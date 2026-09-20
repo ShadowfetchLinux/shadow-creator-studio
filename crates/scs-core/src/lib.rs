@@ -16,7 +16,7 @@ pub mod redaction;
 pub mod settings;
 pub mod wizard;
 
-pub use disk::DiskSpace;
+pub use disk::{format_clock, DiskSpace};
 pub use error::{CoreError, CoreResult};
 pub use filenames::{next_recording_path, sanitize_filename_component};
 pub use markers::{Marker, MarkerFile, MarkerKind};
@@ -24,7 +24,8 @@ pub use migration::migrate;
 pub use modes::RecordingMode;
 pub use quality::QualityPreset;
 pub use recording::{
-    AudioTrackMetadata, ContainerFormat, EncoderMetadata, RecordingMetadata, VideoStreamMetadata,
+    stop_requires_confirmation, AudioTrackMetadata, ContainerFormat, EncoderMetadata,
+    RecordingMetadata, VideoStreamMetadata,
 };
 pub use redaction::{redact_json, redact_text};
 pub use settings::{Settings, SettingsStore, SETTINGS_VERSION};

@@ -76,6 +76,11 @@ pub struct RecordingMetadata {
     pub notes: String,
 }
 
+/// Accidental stop is too easy on a live take. Milestone 3 always confirms.
+pub fn stop_requires_confirmation() -> bool {
+    true
+}
+
 impl RecordingMetadata {
     pub fn new(
         project: impl Into<String>,
@@ -157,5 +162,10 @@ mod tests {
     fn container_extensions() {
         assert_eq!(ContainerFormat::Mkv.extension(), "mkv");
         assert_eq!(ContainerFormat::Mp4.extension(), "mp4");
+    }
+
+    #[test]
+    fn stop_always_asks_in_m3() {
+        assert!(stop_requires_confirmation());
     }
 }

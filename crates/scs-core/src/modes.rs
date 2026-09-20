@@ -40,8 +40,25 @@ impl RecordingMode {
             Self::Screen => "Full desktop",
             Self::Presentation => "Slides + voice",
             Self::Voice => "Mic only",
-            Self::Creator => "Screen + camera",
+            Self::Creator => "Camera + mic",
             Self::Custom => "Manual layout",
+        }
+    }
+
+    /// Modes that actually write a file in Milestone 3.
+    pub fn records_locally(self) -> bool {
+        matches!(
+            self,
+            Self::Camera | Self::Voice | Self::Creator | Self::Custom
+        )
+    }
+
+    pub fn unavailable_reason(self) -> Option<&'static str> {
+        match self {
+            Self::Screen | Self::Presentation => Some(
+                "Desktop capture is not recorded yet. A portal/PipeWire grab would be required; this session will not fake a screen take.",
+            ),
+            _ => None,
         }
     }
 }
@@ -56,5 +73,12 @@ mod tests {
         assert_eq!(json, "\"creator\"");
         let back: RecordingMode = serde_json::from_str(&json).unwrap();
         assert_eq!(back, RecordingMode::Creator);
+    }
+
+    #[test]
+    fn m3_modes_are_honest() {
+        assert!(RecordingMode::Camera.records_locally());
+        assert!(RecordingMode::Voice.records_locally());
+        assert!(RecordingMode::Screen.unavailable_reason().is_some());
     }
 }

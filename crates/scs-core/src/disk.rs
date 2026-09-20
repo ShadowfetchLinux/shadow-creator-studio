@@ -8,6 +8,8 @@ pub struct DiskSpace {
 impl DiskSpace {
     /// Leave 1 GiB free so the volume does not fill during a wrap-up remux.
     pub const RESERVE_BYTES: u64 = 1 << 30;
+    /// Stop a take only when the volume is about to fill. Warn earlier at the reserve.
+    pub const EMERGENCY_BYTES: u64 = 64 * 1024 * 1024;
 
     pub fn from_blocks(fragment_size: u64, blocks: u64, available_blocks: u64) -> Self {
         Self {
@@ -43,6 +45,28 @@ impl DiskSpace {
     pub fn bytes_for_duration(duration_secs: u64, bitrate_bps: u64) -> u64 {
         duration_secs.saturating_mul(bitrate_bps) / 8
     }
+
+    pub fn refuse_start(self) -> bool {
+        self.usable_bytes() == 0
+    }
+
+    pub fn warn_low(self) -> bool {
+        self.available_bytes <= Self::RESERVE_BYTES
+    }
+
+    pub fn emergency_stop(self) -> bool {
+        self.available_bytes < Self::EMERGENCY_BYTES
+    }
+}
+
+/// `HH:MM:SS` for the live recording timer.
+pub fn format_clock(seconds: u64) -> String {
+    format!(
+        "{:02}:{:02}:{:02}",
+        seconds / 3600,
+        (seconds % 3600) / 60,
+        seconds % 60
+    )
 }
 
 pub fn format_bytes(bytes: u64) -> String {
@@ -119,5 +143,32 @@ mod tests {
         assert!(format_bytes(DiskSpace::RESERVE_BYTES).contains("GiB"));
         assert_eq!(format_duration_seconds(90), "1m");
         assert_eq!(format_duration_seconds(3661), "1h 01m");
+        assert_eq!(format_clock(3661), "01:01:01");
+    }
+
+    #[test]
+    fn abort_threshold_uses_reserve_then_emergency() {
+        let start_ok = DiskSpace {
+            total_bytes: 20 * DiskSpace::RESERVE_BYTES,
+            available_bytes: 2 * DiskSpace::RESERVE_BYTES,
+        };
+        assert!(!start_ok.refuse_start());
+        assert!(!start_ok.warn_low());
+        assert!(!start_ok.emergency_stop());
+
+        let warn = DiskSpace {
+            total_bytes: 20 * DiskSpace::RESERVE_BYTES,
+            available_bytes: DiskSpace::RESERVE_BYTES,
+        };
+        assert!(warn.refuse_start());
+        assert!(warn.warn_low());
+        assert!(!warn.emergency_stop());
+
+        let emergency = DiskSpace {
+            total_bytes: 20 * DiskSpace::RESERVE_BYTES,
+            available_bytes: DiskSpace::EMERGENCY_BYTES / 2,
+        };
+        assert!(emergency.refuse_start());
+        assert!(emergency.emergency_stop());
     }
 }
