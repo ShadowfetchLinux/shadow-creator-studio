@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
 use adw::prelude::*;
-use gtk::prelude::*;
 use scs_core::Settings;
 use scs_diagnostics::{collect_report, DiagnosticReport};
 use scs_system::SystemSnapshot;
@@ -10,7 +9,6 @@ use crate::state::StudioState;
 
 pub struct DiagnosticsPage {
     pub root: gtk::ScrolledWindow,
-    list: gtk::ListBox,
 }
 
 impl DiagnosticsPage {
@@ -73,11 +71,7 @@ impl DiagnosticsPage {
 
         let root = gtk::ScrolledWindow::new();
         root.set_child(Some(&column));
-        Self { root, list }
-    }
-
-    pub fn refresh(&self, state: &Rc<StudioState>) {
-        fill(&self.list, state);
+        Self { root }
     }
 }
 

@@ -15,6 +15,7 @@ adw = { package = "libadwaita", version = "0.7.2", features = ["v1_5"] }
 glib = "0.20"
 gtk = { package = "gtk4", version = "0.9.6", features = ["v4_14"] }
 scs-audio.workspace = true
+scs-capture.workspace = true
 scs-core.workspace = true
 scs-diagnostics.workspace = true
 scs-encoder.workspace = true

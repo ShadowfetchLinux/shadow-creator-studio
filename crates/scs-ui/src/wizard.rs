@@ -1,12 +1,16 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::sync::mpsc::Receiver;
+use std::time::Duration;
 
 use adw::prelude::*;
-use gtk::prelude::*;
+use gtk::glib;
+use scs_capture::DeviceInventory;
 use scs_core::quality::QualityPreset;
 use scs_diagnostics::collect_report;
 use scs_system::SystemSnapshot;
 
+use crate::live;
 use crate::state::StudioState;
 
 const STEP_TITLES: [&str; 8] = [
@@ -47,30 +51,25 @@ pub fn present(parent: &adw::ApplicationWindow, state: &Rc<StudioState>) {
     ));
     folder_subtitle.set_wrap(true);
 
+    let camera_page = DeviceStep::build(
+        "Camera",
+        "Names and formats come from a background scan. Preview lives on the Record page — this step does not run a fake pass.",
+    );
+    let mic_page = DeviceStep::build(
+        "Microphone",
+        "PipeWire sources are listed when pw-dump succeeds. A real meter runs on the Record page.",
+    );
+    let desk_page = DeviceStep::build(
+        "Desktop audio",
+        "Monitor sources appear when PipeWire reports a sink or loopback. System mic routing is never rewritten.",
+    );
+
     stack.add_named(&welcome_page(), Some("0"));
     stack.add_named(&folder_page(state, &window, &folder_subtitle), Some("1"));
     stack.add_named(&quality_page(state), Some("2"));
-    stack.add_named(
-        &device_page(
-            "Camera",
-            "Pick a camera in a later milestone. The test button does not run a fake pass.",
-        ),
-        Some("3"),
-    );
-    stack.add_named(
-        &device_page(
-            "Microphone",
-            "Mic listing and a real level test arrive in Milestone 2.",
-        ),
-        Some("4"),
-    );
-    stack.add_named(
-        &device_page(
-            "Desktop audio",
-            "Desktop capture is planned as a separate track. Test unavailable.",
-        ),
-        Some("5"),
-    );
+    stack.add_named(&camera_page.root, Some("3"));
+    stack.add_named(&mic_page.root, Some("4"));
+    stack.add_named(&desk_page.root, Some("5"));
     stack.add_named(&hardware_page(state), Some("6"));
     stack.add_named(&review_page(state), Some("7"));
     stack.add_named(&ready_page(), Some("ready"));
@@ -106,10 +105,7 @@ pub fn present(parent: &adw::ApplicationWindow, state: &Rc<StudioState>) {
     let step_b = Rc::clone(&step);
     back.connect_clicked(move |_| {
         let current = step_b.get();
-        if current == 0 {
-            return;
-        }
-        if current == usize::MAX {
+        if current == 0 || current == usize::MAX {
             return;
         }
         let next_idx = current.saturating_sub(1);
@@ -151,17 +147,136 @@ pub fn present(parent: &adw::ApplicationWindow, state: &Rc<StudioState>) {
         let _ = state_n.complete_wizard();
         step.set(usize::MAX);
         stack_n.set_visible_child_name("ready");
-        status_n.set_text("You're ready to record.");
+        status_n.set_text("You're ready to preview.");
         btn.set_label("Close");
+    });
+
+    let discover: Rc<RefCell<Option<Receiver<DeviceInventory>>>> =
+        Rc::new(RefCell::new(Some(live::spawn_discover())));
+    glib::timeout_add_local(Duration::from_millis(200), move || {
+        let borrowed = discover.borrow();
+        let Some(rx) = borrowed.as_ref() else {
+            return glib::ControlFlow::Break;
+        };
+        match rx.try_recv() {
+            Ok(inventory) => {
+                drop(borrowed);
+                camera_page.apply_cameras(&inventory);
+                mic_page.apply_mics(&inventory);
+                desk_page.apply_desktop(&inventory);
+                *discover.borrow_mut() = None;
+                glib::ControlFlow::Break
+            }
+            Err(_) => glib::ControlFlow::Continue,
+        }
     });
 
     window.present();
 }
 
+struct DeviceStep {
+    root: gtk::Box,
+    list: gtk::Box,
+}
+
+impl DeviceStep {
+    fn build(title: &str, body: &str) -> Rc<Self> {
+        let root = page_frame(title, body);
+        let list = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        let scanning = gtk::Label::new(Some("Scanning in the background…"));
+        scanning.add_css_class("dim-label");
+        scanning.set_halign(gtk::Align::Start);
+        list.append(&scanning);
+        let note = gtk::Label::new(Some(
+            "Use the Record page for live preview and meters. This wizard does not fake a test.",
+        ));
+        note.add_css_class("scs-unavailable");
+        note.set_halign(gtk::Align::Start);
+        note.set_wrap(true);
+        root.append(&list);
+        root.append(&note);
+        Rc::new(Self { root, list })
+    }
+
+    fn replace_list(&self, lines: &[String]) {
+        while let Some(child) = self.list.first_child() {
+            self.list.remove(&child);
+        }
+        if lines.is_empty() {
+            let empty = gtk::Label::new(Some("Unavailable — nothing was found."));
+            empty.add_css_class("scs-unavailable");
+            empty.set_halign(gtk::Align::Start);
+            empty.set_wrap(true);
+            self.list.append(&empty);
+            return;
+        }
+        for line in lines {
+            let row = gtk::Label::new(Some(line));
+            row.set_halign(gtk::Align::Start);
+            row.set_wrap(true);
+            self.list.append(&row);
+        }
+    }
+
+    fn apply_cameras(&self, inventory: &DeviceInventory) {
+        let mut lines: Vec<String> = inventory
+            .cameras
+            .iter()
+            .map(|camera| camera.label())
+            .collect();
+        if lines.is_empty() {
+            lines.extend(
+                inventory
+                    .errors
+                    .iter()
+                    .filter(|e| e.to_ascii_lowercase().contains("camera"))
+                    .cloned(),
+            );
+        }
+        self.replace_list(&lines);
+    }
+
+    fn apply_mics(&self, inventory: &DeviceInventory) {
+        let mut lines: Vec<String> = inventory
+            .microphones
+            .iter()
+            .map(|mic| mic.name.clone())
+            .collect();
+        if lines.is_empty() {
+            lines.extend(
+                inventory
+                    .errors
+                    .iter()
+                    .filter(|e| e.to_ascii_lowercase().contains("microphone"))
+                    .cloned(),
+            );
+        }
+        self.replace_list(&lines);
+    }
+
+    fn apply_desktop(&self, inventory: &DeviceInventory) {
+        let mut lines: Vec<String> = inventory
+            .desktop_audio
+            .iter()
+            .map(|desk| desk.name.clone())
+            .collect();
+        if lines.is_empty() {
+            lines.extend(
+                inventory
+                    .errors
+                    .iter()
+                    .filter(|e| e.to_ascii_lowercase().contains("desktop"))
+                    .cloned(),
+            );
+        }
+        self.replace_list(&lines);
+    }
+}
+
 fn welcome_page() -> gtk::Box {
     page_frame(
         "Welcome to Shadow Creator Studio",
-        "A simple creator surface on top of OBS, FFmpeg, PipeWire, and NVIDIA NVENC.\n\nMilestone 1 is the shell. Recording, meters, and live streaming stay disabled until later milestones — those buttons will not pretend to work.",
+        "A simple creator surface on top of OBS, FFmpeg, PipeWire, and NVIDIA NVENC.\n\nMilestone 2 lists cameras and PipeWire audio and previews them on the Record page. START RECORDING and GO LIVE stay disabled until later milestones.",
     )
 }
 
@@ -179,13 +294,13 @@ fn folder_page(
     let browse = gtk::Button::with_label("Choose folder");
     let window = window.clone();
     let state = Rc::clone(state);
-    let subtitle = subtitle.clone();
+    let subtitle_btn = subtitle.clone();
     browse.connect_clicked(move |_| {
         let dialog = gtk::FileDialog::builder()
             .title("Recording folder")
             .build();
         let state = Rc::clone(&state);
-        let subtitle = subtitle.clone();
+        let subtitle = subtitle_btn.clone();
         dialog.select_folder(Some(&window), gtk::gio::Cancellable::NONE, move |result| {
             if let Ok(file) = result {
                 if let Some(path) = file.path() {
@@ -232,19 +347,6 @@ fn quality_page(state: &Rc<StudioState>) -> gtk::Box {
     root
 }
 
-fn device_page(title: &str, body: &str) -> gtk::Box {
-    let root = page_frame(title, body);
-    let test = gtk::Button::with_label("Test — unavailable");
-    test.set_sensitive(false);
-    test.set_tooltip_text(Some("Device tests arrive in a later milestone"));
-    let note = gtk::Label::new(Some("Unavailable — this is not a pass."));
-    note.add_css_class("scs-unavailable");
-    note.set_halign(gtk::Align::Start);
-    root.append(&test);
-    root.append(&note);
-    root
-}
-
 fn hardware_page(state: &StudioState) -> gtk::Box {
     let root = page_frame(
         "Hardware check",
@@ -270,18 +372,21 @@ fn hardware_page(state: &StudioState) -> gtk::Box {
 fn review_page(state: &StudioState) -> gtk::Box {
     let settings = state.settings.borrow();
     let body = format!(
-        "Folder: {}\nQuality: {}\nMode: {}\nContainer: MKV (crash-safe)\nEngine plan: OBS first, FFmpeg fallback\n\nRecording and GO LIVE stay unavailable until later milestones.",
+        "Folder: {}\nQuality: {}\nMode: {}\nCamera: {}\nMic: {}\nDesktop: {}\nContainer: MKV (crash-safe)\nEngine plan: OBS first, FFmpeg fallback\n\nRecording and GO LIVE stay unavailable until later milestones.",
         settings.recording.folder.display(),
         settings.recording.quality.label(),
-        settings.last_recording_mode.label()
+        settings.last_recording_mode.label(),
+        settings.camera.label.clone().unwrap_or_else(|| "not selected yet".into()),
+        settings.audio.mic_label.clone().unwrap_or_else(|| "not selected yet".into()),
+        settings.audio.desktop_label.clone().unwrap_or_else(|| "not selected yet".into()),
     );
     page_frame("Review", &body)
 }
 
 fn ready_page() -> gtk::Box {
     page_frame(
-        "You're ready to record.",
-        "The studio shell is set up. Press Close, then explore Record, Settings, and Diagnostics.\n\nSTART RECORDING remains disabled until Milestone 3 — that is intentional.",
+        "You're ready to preview.",
+        "The studio can list devices and show a live camera plus meters. Press Close, then use Record.\n\nSTART RECORDING remains disabled until Milestone 3 — that is intentional.",
     )
 }
 

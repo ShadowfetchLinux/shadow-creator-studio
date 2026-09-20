@@ -86,13 +86,6 @@ fn probe_encoder_status() -> String {
     }
 }
 
-pub fn format_metric(value: Option<String>) -> (String, bool) {
-    match value {
-        Some(v) => (v, true),
-        None => ("—".into(), false),
-    }
-}
-
 pub fn app_subtitle() -> String {
-    format!("{APP_NAME} · Milestone 1")
+    format!("{APP_NAME} · Milestone 2")
 }

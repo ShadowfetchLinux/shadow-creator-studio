@@ -103,3 +103,24 @@
   border-radius: 999px;
   padding: 4px 10px;
 }
+
+.scs-source-row {
+  padding: 2px 0;
+}
+
+.scs-source-tile {
+  min-width: 180px;
+}
+
+.scs-meter-bar {
+  min-height: 12px;
+}
+
+.scs-clip {
+  min-height: 1em;
+}
+
+.scs-clip-hot {
+  color: #e07070;
+  font-weight: 700;
+}

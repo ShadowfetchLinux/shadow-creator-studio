@@ -1,10 +1,15 @@
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::sync::mpsc::Receiver;
+use std::time::Duration;
 
 use adw::prelude::*;
 use gtk::gio;
 use gtk::glib;
-use gtk::prelude::*;
+use scs_capture::DeviceInventory;
+use scs_system::SystemSnapshot;
 
+use crate::live;
 use crate::pages;
 use crate::state::{app_subtitle, StudioState};
 use crate::wizard;
@@ -84,8 +89,8 @@ pub fn start(app: &adw::Application) {
 
     let split = adw::NavigationSplitView::new();
     split.set_min_sidebar_width(196.0);
-    split.set_sidebar(&adw::NavigationPage::new(&sidebar_list, "Studio"));
-    split.set_content(&adw::NavigationPage::new(&stack, "Record"));
+    split.set_sidebar(Some(&adw::NavigationPage::new(&sidebar_list, "Studio")));
+    split.set_content(Some(&adw::NavigationPage::new(&stack, "Record")));
     toolbar.set_content(Some(&split));
     window.set_content(Some(&toolbar));
 
@@ -100,16 +105,16 @@ pub fn start(app: &adw::Application) {
     let about_action = gio::SimpleAction::new("about", None);
     let window_a = window.clone();
     about_action.connect_activate(move |_, _| {
-        let about = adw::AboutWindow::builder()
-            .transient_for(&window_a)
-            .modal(true)
-            .application_name("Shadow Creator Studio")
-            .application_id(scs_core::APP_ID)
-            .version(scs_core::APP_VERSION)
-            .developer_name("Shadowfetch")
-            .comments("Milestone 1 application shell. Recording and live streaming are not implemented yet.")
-            .license_type(gtk::License::MitX11)
-            .build();
+        let about = adw::AboutWindow::new();
+        about.set_transient_for(Some(&window_a));
+        about.set_modal(true);
+        about.set_application_name("Shadow Creator Studio");
+        about.set_version(scs_core::APP_VERSION);
+        about.set_developer_name("Shadowfetch");
+        about.set_comments(
+            "Milestone 2: live camera preview and audio meters. Recording and live streaming are not implemented yet.",
+        );
+        about.set_license_type(gtk::License::MitX11);
         about.present();
     });
     window.add_action(&about_action);
@@ -122,9 +127,32 @@ pub fn start(app: &adw::Application) {
 
     let state_t = Rc::clone(&state);
     let record_t = Rc::clone(&record);
-    glib::timeout_add_local_seconds(2, move || {
-        let snap = state_t.monitor.borrow_mut().snapshot();
-        record_t.refresh(&state_t, &snap);
+    let discover_rx: Rc<RefCell<Option<Receiver<DeviceInventory>>>> =
+        Rc::new(RefCell::new(Some(live::spawn_discover())));
+    let ticks = Rc::new(Cell::new(0u32));
+    let last_snap: Rc<RefCell<SystemSnapshot>> =
+        Rc::new(RefCell::new(state.monitor.borrow_mut().snapshot()));
+
+    glib::timeout_add_local(Duration::from_millis(50), move || {
+        let incoming = {
+            let guard = discover_rx.borrow();
+            guard.as_ref().and_then(|rx| rx.try_recv().ok())
+        };
+        if let Some(inventory) = incoming {
+            record_t.apply_inventory(inventory, &state_t);
+            *discover_rx.borrow_mut() = None;
+        }
+
+        let n = ticks.get().wrapping_add(1);
+        ticks.set(n);
+        if n % 40 == 0 {
+            *last_snap.borrow_mut() = state_t.monitor.borrow_mut().snapshot();
+        }
+        if n % 400 == 0 && discover_rx.borrow().is_none() {
+            *discover_rx.borrow_mut() = Some(live::spawn_discover());
+        }
+
+        record_t.refresh(&state_t, &last_snap.borrow());
         glib::ControlFlow::Continue
     });
 }

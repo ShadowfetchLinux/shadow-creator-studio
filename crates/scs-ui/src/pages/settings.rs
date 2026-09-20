@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
 use adw::prelude::*;
-use gtk::prelude::*;
 use scs_core::quality::QualityPreset;
 use scs_core::settings::AudioProcessingPreset;
 
@@ -14,7 +13,7 @@ pub fn build(state: &Rc<StudioState>, window: &adw::ApplicationWindow) -> gtk::S
     page.add(&general_group(state, window));
     page.add(&video_group(state));
     page.add(&audio_group(state));
-    page.add(&camera_group());
+    page.add(&camera_group(state));
     page.add(&recording_group(state, window));
     page.add(&streaming_group());
     page.add(&hotkeys_group());
@@ -33,7 +32,7 @@ fn general_group(state: &Rc<StudioState>, window: &adw::ApplicationWindow) -> ad
 
     let theme = adw::ActionRow::builder()
         .title("Theme")
-        .subtitle("Dark professional (forced in Milestone 1)")
+        .subtitle("Dark professional (forced)")
         .build();
     group.add(&theme);
 
@@ -112,24 +111,72 @@ fn audio_group(state: &Rc<StudioState>) -> adw::PreferencesGroup {
     });
     group.add(&tracks);
 
+    let settings = state.settings.borrow();
     let devices = adw::ActionRow::builder()
-        .title("Devices")
-        .subtitle("Device enumeration arrives in Milestone 2")
-        .sensitive(false)
+        .title("Last microphone")
+        .subtitle(
+            settings
+                .audio
+                .mic_label
+                .clone()
+                .unwrap_or_else(|| "None selected yet — pick one on the Record page".into()),
+        )
         .build();
     group.add(&devices);
+    let desktop = adw::ActionRow::builder()
+        .title("Last desktop audio")
+        .subtitle(
+            settings
+                .audio
+                .desktop_label
+                .clone()
+                .unwrap_or_else(|| "None selected yet — pick a monitor on the Record page".into()),
+        )
+        .build();
+    group.add(&desktop);
     group
 }
 
-fn camera_group() -> adw::PreferencesGroup {
+fn camera_group(state: &Rc<StudioState>) -> adw::PreferencesGroup {
+    let settings = state.settings.borrow();
     let group = adw::PreferencesGroup::new();
     group.set_title("Camera");
+    group.set_description(Some(
+        "Choose the camera on the Record page. The last device and mirror option are saved.",
+    ));
     let row = adw::ActionRow::builder()
-        .title("Camera device")
-        .subtitle("Unavailable — camera listing arrives with preview")
-        .sensitive(false)
+        .title("Last camera")
+        .subtitle(
+            settings
+                .camera
+                .label
+                .clone()
+                .unwrap_or_else(|| "None selected yet — pick one on the Record page".into()),
+        )
         .build();
     group.add(&row);
+    let display = adw::ActionRow::builder()
+        .title("Last display")
+        .subtitle(
+            settings
+                .video
+                .display_label
+                .clone()
+                .unwrap_or_else(|| "None selected yet".into()),
+        )
+        .build();
+    group.add(&display);
+    let mirror = adw::SwitchRow::builder()
+        .title("Mirror preview")
+        .subtitle("Horizontal flip for the live camera preview only. Not a recording setting yet.")
+        .active(settings.camera.mirror_preview)
+        .build();
+    let state_m = Rc::clone(state);
+    mirror.connect_active_notify(move |row| {
+        state_m.settings.borrow_mut().camera.mirror_preview = row.is_active();
+        let _ = state_m.persist();
+    });
+    group.add(&mirror);
     group
 }
 

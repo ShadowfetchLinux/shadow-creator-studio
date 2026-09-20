@@ -76,14 +76,16 @@ impl StatusStrip {
         };
         let mic = settings
             .audio
-            .mic_device
+            .mic_label
             .clone()
-            .unwrap_or_else(|| "Unavailable — no device list yet".into());
+            .or_else(|| settings.audio.mic_device.clone())
+            .unwrap_or_else(|| "Unavailable — no microphone".into());
         let camera = settings
             .camera
-            .device
+            .label
             .clone()
-            .unwrap_or_else(|| "Unavailable — no device list yet".into());
+            .or_else(|| settings.camera.device.clone())
+            .unwrap_or_else(|| "Unavailable — no camera".into());
 
         let values = [
             "Status: Idle · recording starts in Milestone 3".to_string(),
