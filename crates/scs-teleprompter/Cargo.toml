@@ -1,0 +1,12 @@
+[package]
+name = "scs-teleprompter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Teleprompter script types (UI in M7)"
+
+[dependencies]
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

@@ -1,0 +1,9 @@
+[package]
+name = "scs-pipewire"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "PipeWire presence detection (no session in M1)"
+
+[dependencies]
+serde.workspace = true

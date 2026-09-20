@@ -1,0 +1,63 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/scs-core",
+    "crates/scs-system",
+    "crates/scs-audio",
+    "crates/scs-video",
+    "crates/scs-capture",
+    "crates/scs-encoder",
+    "crates/scs-pipewire",
+    "crates/scs-ffmpeg",
+    "crates/scs-obs",
+    "crates/scs-library",
+    "crates/scs-teleprompter",
+    "crates/scs-diagnostics",
+    "crates/scs-ui",
+]
+default-members = [
+    "crates/scs-core",
+    "crates/scs-system",
+    "crates/scs-audio",
+    "crates/scs-video",
+    "crates/scs-capture",
+    "crates/scs-encoder",
+    "crates/scs-pipewire",
+    "crates/scs-ffmpeg",
+    "crates/scs-obs",
+    "crates/scs-library",
+    "crates/scs-teleprompter",
+    "crates/scs-diagnostics",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Shadowfetch"]
+rust-version = "1.80"
+description = "Linux desktop studio for YouTube-quality recording"
+
+[workspace.dependencies]
+scs-core = { path = "crates/scs-core" }
+scs-system = { path = "crates/scs-system" }
+scs-audio = { path = "crates/scs-audio" }
+scs-video = { path = "crates/scs-video" }
+scs-capture = { path = "crates/scs-capture" }
+scs-encoder = { path = "crates/scs-encoder" }
+scs-pipewire = { path = "crates/scs-pipewire" }
+scs-ffmpeg = { path = "crates/scs-ffmpeg" }
+scs-obs = { path = "crates/scs-obs" }
+scs-library = { path = "crates/scs-library" }
+scs-teleprompter = { path = "crates/scs-teleprompter" }
+scs-diagnostics = { path = "crates/scs-diagnostics" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+chrono = { version = "0.4", features = ["serde", "clock"] }
+dirs = "6"
+tempfile = "3"
+uuid = { version = "1", features = ["v4", "serde"] }
+rustix = { version = "1", features = ["fs"] }
+regex = "1"
+nvml-wrapper = "0.10"

@@ -1,0 +1,13 @@
+[package]
+name = "scs-library"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Recording library index types (UI in M6)"
+
+[dependencies]
+scs-core.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

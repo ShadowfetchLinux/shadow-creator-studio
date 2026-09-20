@@ -1,0 +1,13 @@
+[package]
+name = "scs-video"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Video format and stream types"
+
+[dependencies]
+scs-core.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

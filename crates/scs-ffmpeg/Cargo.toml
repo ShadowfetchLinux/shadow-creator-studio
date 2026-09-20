@@ -1,0 +1,10 @@
+[package]
+name = "scs-ffmpeg"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Typed FFmpeg command builder (never shell-interpolated)"
+
+[dependencies]
+scs-core.workspace = true
+scs-encoder.workspace = true

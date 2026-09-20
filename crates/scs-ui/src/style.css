@@ -1,0 +1,105 @@
+.scs-window {
+  background-color: #101216;
+}
+
+.scs-sidebar {
+  background-color: #14181e;
+  padding: 8px 6px;
+}
+
+.scs-preview {
+  background-color: #0a0c10;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  min-height: 340px;
+  padding: 24px;
+}
+
+.scs-preview-kicker {
+  color: #c9a46a;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  font-size: 0.72rem;
+}
+
+.scs-preview-title {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.scs-preview-sub {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.scs-mode-tile {
+  border-radius: 14px;
+  min-width: 132px;
+  min-height: 92px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: #181c23;
+}
+
+.scs-mode-tile:checked {
+  border-color: #d7b07a;
+  background: #221c14;
+}
+
+.scs-mode-title {
+  font-weight: 700;
+}
+
+.scs-rec-button {
+  min-height: 58px;
+  min-width: 280px;
+  border-radius: 999px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  background: #3a2226;
+  color: #f3c9c9;
+}
+
+.scs-live-button {
+  min-height: 46px;
+  min-width: 180px;
+  border-radius: 999px;
+}
+
+.scs-card {
+  background: #161a21;
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.scs-meter-track {
+  min-height: 10px;
+  border-radius: 999px;
+  background: #1b2028;
+}
+
+.scs-metric-value {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.scs-metric-label {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+
+.scs-unavailable {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.scs-gold {
+  color: #d7b07a;
+}
+
+.scs-status-chip {
+  background: #1b2028;
+  border-radius: 999px;
+  padding: 4px 10px;
+}

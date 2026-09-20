@@ -1,0 +1,13 @@
+[package]
+name = "scs-audio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Audio device and processing-chain types (implementation starts M4)"
+
+[dependencies]
+scs-core.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

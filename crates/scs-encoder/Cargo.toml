@@ -1,0 +1,10 @@
+[package]
+name = "scs-encoder"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Encoder capability types and FFmpeg encoder-list parsing"
+
+[dependencies]
+scs-core.workspace = true
+serde.workspace = true

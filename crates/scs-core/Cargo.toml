@@ -1,0 +1,18 @@
+[package]
+name = "scs-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Settings, filenames, recording metadata, and shared types"
+
+[dependencies]
+chrono.workspace = true
+dirs.workspace = true
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

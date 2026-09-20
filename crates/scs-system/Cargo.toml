@@ -1,0 +1,12 @@
+[package]
+name = "scs-system"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Cheap host probes: /proc, NVML, statvfs, hwmon"
+
+[dependencies]
+nvml-wrapper.workspace = true
+rustix.workspace = true
+scs-core.workspace = true
+thiserror.workspace = true
