@@ -169,7 +169,7 @@ Cargo workspace. Small crates, no giant sources.
 | `scs-ffmpeg` | Typed argv builder, remux/record plans, camera preview argv | Record plans include filter_complex pad graphs |
 | `scs-obs` | WebSocket client config + install probe | Probe only; no session |
 | `scs-library` | Folder index, sidecar metadata, delete confirm | **M5 implemented + tested** |
-| `scs-teleprompter` | Script types | Types + empty UI page |
+| `scs-teleprompter` | Script, font/speed bounds, scroll math | **M6 implemented + tested** |
 | `scs-diagnostics` | Redacted report assembly | **Implemented** |
 | `scs-ui` | GTK4 + libadwaita shell + live preview/meters | **Implemented**; needs `-dev` packages to compile |
 
@@ -198,7 +198,7 @@ Disabled + labeled. Examples already in the shell:
 | **M4** | Audio processing | Separate tracks, mute/volume, FFmpeg chain, presets, calibration |
 | **M5** | Library + FFmpeg tools | Folder index, sidecar, remux/export/trim/normalize/GIF/thumb |
 | **M6** | Library | Index, markers, remux MKV→MP4 without re-encode, never delete MKV until verified |
-| **M7** | Teleprompter | Script, scroll, readability; optional later caption hook |
+| **M6** | Teleprompter + markers + hotkeys | In-app accelerators, chapter sidecar, no global grabs |
 | **M8** | YouTube Live | GO LIVE, keyring-backed stream key, YouTube-friendly encode |
 
 ### What M1 includes vs later

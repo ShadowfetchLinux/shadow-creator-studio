@@ -77,9 +77,13 @@ pub struct RecordingMetadata {
     pub notes: String,
 }
 
-/// Accidental stop is too easy on a live take. Milestone 3 always confirms.
+/// Accidental stop is too easy on a live take. Default is confirm; Settings can opt out.
 pub fn stop_requires_confirmation() -> bool {
     true
+}
+
+pub fn stop_requires_confirmation_pref(confirm: bool) -> bool {
+    confirm
 }
 
 impl RecordingMetadata {

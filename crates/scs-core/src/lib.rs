@@ -6,6 +6,7 @@
 pub mod disk;
 pub mod error;
 pub mod filenames;
+pub mod hotkeys;
 pub mod markers;
 pub mod migration;
 pub mod modes;
@@ -19,12 +20,13 @@ pub mod wizard;
 pub use disk::{format_clock, DiskSpace};
 pub use error::{CoreError, CoreResult};
 pub use filenames::{next_recording_path, sanitize_filename_component};
+pub use hotkeys::{parse_hotkey, HotkeyAction, ParsedHotkey};
 pub use markers::{Marker, MarkerFile, MarkerKind};
 pub use migration::migrate;
 pub use modes::RecordingMode;
 pub use quality::QualityPreset;
 pub use recording::{
-    stop_requires_confirmation, AudioTrackMetadata, ContainerFormat, EncoderMetadata,
+    stop_requires_confirmation, stop_requires_confirmation_pref, AudioTrackMetadata, ContainerFormat, EncoderMetadata,
     RecordingMetadata, VideoStreamMetadata,
 };
 pub use redaction::{redact_json, redact_text};

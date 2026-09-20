@@ -5,8 +5,8 @@ tutorials, and voice — with a simple creator-focused interface. The long-term
 engine is OBS Studio (via WebSocket) with FFmpeg + NVIDIA NVENC as the
 tooling and fallback path.
 
-**Milestone 5** adds a recordings library and FFmpeg quick-edit tools. Screen
-and GO LIVE stay unavailable.
+**Milestone 6** adds a teleprompter, chapter markers, and in-app hotkeys.
+Screen and GO LIVE stay unavailable. Global shortcuts are not available.
 
 ## Screenshots
 
@@ -39,6 +39,9 @@ and GO LIVE stay unavailable.
 - Library page indexes the configured recordings folder (not the whole disk)
 - Play, open folder, rename, remux, export, copy path, delete with confirm
 - Quick edit writes a **new** file: trim, normalize, 720p, compress, extract audio, MP3, WAV, GIF, thumbnail, YouTube-ready MP4
+- Teleprompter: paste script, font size, scroll speed, pause, mirrored, overlay window
+- In-app hotkeys (F9 start/stop, F8 marker, F7 mute, F6 camera, F5 teleprompter)
+- Markers write `*.markers.json` beside the take for later chapters
 - Crash-safe **MKV** names like `2026-09-20_YouTube_Record_001.mkv` — never overwrites
 - Hardware encode when FFmpeg lists NVENC (H.264 / HEVC / AV1); otherwise libx264
 - Quality presets: YouTube Standard / High Quality / 4K, Archival, Small File, Custom
@@ -53,7 +56,7 @@ and GO LIVE stay unavailable.
 | GO LIVE | Available in a later milestone (M8) |
 | Window / region capture | Structured, labeled unavailable |
 | Live desktop frames | Selected-display placeholder (portal capture is later) |
-| Teleprompter | Empty state until the next milestone |
+| Global hotkeys | Unavailable — no rootless compositor grab |
 | Mic speaker monitor loop | Not created — use headphones + the desktop mixer |
 
 ## Dependencies

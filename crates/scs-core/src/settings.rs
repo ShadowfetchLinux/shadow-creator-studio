@@ -272,7 +272,13 @@ impl Default for StreamingSettings {
 pub struct HotkeySettings {
     pub start_stop: String,
     pub pause: String,
+    pub mute_mic: String,
+    pub mute_desktop: String,
     pub marker: String,
+    pub toggle_camera: String,
+    pub toggle_teleprompter: String,
+    /// Accidental stop still confirms unless the user turns this off.
+    pub confirm_stop: bool,
 }
 
 impl Default for HotkeySettings {
@@ -280,7 +286,12 @@ impl Default for HotkeySettings {
         Self {
             start_stop: "F9".into(),
             pause: "F10".into(),
+            mute_mic: "F7".into(),
+            mute_desktop: "Shift+F7".into(),
             marker: "F8".into(),
+            toggle_camera: "F6".into(),
+            toggle_teleprompter: "F5".into(),
+            confirm_stop: true,
         }
     }
 }

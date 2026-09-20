@@ -4,8 +4,10 @@ use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
 use adw::prelude::*;
+use gtk::gdk;
 use gtk::gio;
 use gtk::glib;
+use scs_core::hotkeys::{self, HotkeyAction};
 use scs_capture::DeviceInventory;
 use scs_system::SystemSnapshot;
 
@@ -64,11 +66,8 @@ pub fn start(app: &adw::Application) {
     stack.set_transition_type(gtk::StackTransitionType::Crossfade);
     stack.add_titled(&record.root, Some("record"), "Record");
     stack.add_titled(&library.root, Some("library"), "Library");
-    stack.add_titled(
-        &pages::teleprompter::build(),
-        Some("teleprompter"),
-        "Teleprompter",
-    );
+    let teleprompter = pages::teleprompter::TeleprompterPage::new(&state);
+    stack.add_titled(&teleprompter.root, Some("teleprompter"), "Teleprompter");
     stack.add_titled(
         &pages::settings::build(&state, &window),
         Some("settings"),
@@ -115,12 +114,63 @@ pub fn start(app: &adw::Application) {
         about.set_version(scs_core::APP_VERSION);
         about.set_developer_name("Shadowfetch");
         about.set_comments(
-            "Milestone 5: library + FFmpeg tools. Screen and GO LIVE stay unavailable.",
+            "Milestone 6: teleprompter, markers, in-app hotkeys. Global shortcuts are not available on this desktop.",
         );
         about.set_license_type(gtk::License::MitX11);
         about.present();
     });
     window.add_action(&about_action);
+
+    let keys = gtk::EventControllerKey::new();
+    let state_k = Rc::clone(&state);
+    let record_k = Rc::clone(&record);
+    let tele_k = Rc::clone(&teleprompter);
+    let stack_k = stack.clone();
+    keys.connect_key_pressed(move |_, key, _, mods| {
+        let name = key
+            .name()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| format!("{key:?}"));
+        let ctrl = mods.contains(gdk::ModifierType::CONTROL_MASK);
+        let alt = mods.contains(gdk::ModifierType::ALT_MASK);
+        let shift = mods.contains(gdk::ModifierType::SHIFT_MASK);
+        let bindings = hotkeys::bindings(&state_k.settings.borrow().hotkeys);
+        for (action, spec) in bindings {
+            if hotkeys::matches(&spec, &name, ctrl, alt, shift) {
+                match action {
+                    HotkeyAction::StartStop => record_k.on_hotkey_record(&state_k),
+                    HotkeyAction::Pause => tele_k.toggle_pause(&state_k),
+                    HotkeyAction::MuteMic => {
+                        let next = !state_k.settings.borrow().audio.mic_muted;
+                        state_k.settings.borrow_mut().audio.mic_muted = next;
+                        let _ = state_k.persist();
+                    }
+                    HotkeyAction::MuteDesktop => {
+                        let next = !state_k.settings.borrow().audio.desktop_muted;
+                        state_k.settings.borrow_mut().audio.desktop_muted = next;
+                        let _ = state_k.persist();
+                    }
+                    HotkeyAction::Marker => record_k.drop_marker(&state_k),
+                    HotkeyAction::ToggleCamera => {
+                        state_k
+                            .camera_preview
+                            .set(!state_k.camera_preview.get());
+                    }
+                    HotkeyAction::ToggleTeleprompter => {
+                        let name = stack_k.visible_child_name();
+                        if name.as_deref() == Some("teleprompter") {
+                            stack_k.set_visible_child_name("record");
+                        } else {
+                            stack_k.set_visible_child_name("teleprompter");
+                        }
+                    }
+                }
+                return glib::Propagation::Stop;
+            }
+        }
+        glib::Propagation::Proceed
+    });
+    window.add_controller(keys);
 
     window.present();
 

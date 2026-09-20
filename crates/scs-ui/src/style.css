@@ -124,3 +124,7 @@
   color: #e07070;
   font-weight: 700;
 }
+
+.scs-mirror {
+  transform: scaleX(-1);
+}

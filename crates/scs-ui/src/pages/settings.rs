@@ -17,7 +17,7 @@ pub fn build(state: &Rc<StudioState>, window: &adw::ApplicationWindow) -> gtk::S
     page.add(&camera_group(state));
     page.add(&recording_group(state, window));
     page.add(&streaming_group());
-    page.add(&hotkeys_group());
+    page.add(&hotkeys_group(state));
     page.add(&advanced_group(state));
     page.add(&restore_group(state, window));
 
@@ -289,22 +289,39 @@ fn streaming_group() -> adw::PreferencesGroup {
     group
 }
 
-fn hotkeys_group() -> adw::PreferencesGroup {
+fn hotkeys_group(state: &Rc<StudioState>) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::new();
     group.set_title("Hotkeys");
-    group.set_description(Some("Shown as the planned defaults. Binding arrives later."));
-    for (title, key) in [
-        ("Start / stop", "F9"),
-        ("Pause", "F10"),
-        ("Marker", "F8"),
+    group.set_description(Some(
+        "In-app only. Global shortcuts are unavailable on this COSMIC/Wayland session without a compositor portal (no root hooks).",
+    ));
+    let keys = state.settings.borrow().hotkeys.clone();
+    for (title, value) in [
+        ("Start / stop", keys.start_stop),
+        ("Pause teleprompter", keys.pause),
+        ("Mute mic (next take)", keys.mute_mic),
+        ("Mute desktop (next take)", keys.mute_desktop),
+        ("Marker", keys.marker),
+        ("Toggle camera preview", keys.toggle_camera),
+        ("Toggle teleprompter", keys.toggle_teleprompter),
     ] {
         let row = adw::ActionRow::builder()
             .title(title)
-            .subtitle(format!("{key} · Available in a later milestone"))
-            .sensitive(false)
+            .subtitle(value)
             .build();
         group.add(&row);
     }
+    let confirm = adw::SwitchRow::builder()
+        .title("Confirm before stop")
+        .subtitle("Recommended. Accidental stop still asks unless you turn this off.")
+        .active(state.settings.borrow().hotkeys.confirm_stop)
+        .build();
+    let state_c = Rc::clone(state);
+    confirm.connect_active_notify(move |row| {
+        state_c.settings.borrow_mut().hotkeys.confirm_stop = row.is_active();
+        let _ = state_c.persist();
+    });
+    group.add(&confirm);
     group
 }
 

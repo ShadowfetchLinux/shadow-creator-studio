@@ -17,7 +17,7 @@ use crate::live::preview::{self as preview_live, PreviewEvent};
 use crate::live::record::{self as rec_live, RecordEvent};
 use crate::state::StudioState;
 use crate::widgets::{dashboard, meters, mode_tiles, preview, sources, status_strip, tracks};
-use scs_core::stop_requires_confirmation;
+use scs_core::{stop_requires_confirmation_pref, MarkerFile};
 
 pub struct RecordPage {
     pub root: gtk::ScrolledWindow,
@@ -250,10 +250,11 @@ impl RecordPage {
         let mode = state.settings.borrow().last_recording_mode;
         let inventory = self.inventory.borrow();
         let settings = state.settings.borrow();
-        let want_cam = matches!(
-            mode,
-            RecordingMode::Camera | RecordingMode::Creator | RecordingMode::Custom
-        );
+        let want_cam = state.camera_preview.get()
+            && matches!(
+                mode,
+                RecordingMode::Camera | RecordingMode::Creator | RecordingMode::Custom
+            );
         let camera = settings.camera.device.clone().and_then(|path| {
             inventory
                 .cameras
@@ -281,6 +282,16 @@ impl RecordPage {
             .unwrap_or_else(|| "No display selected".into());
         drop(settings);
 
+        if !state.camera_preview.get() {
+            self.stop_preview();
+            self.preview.show_message(
+                "Camera preview off",
+                "F6 toggles the preview. The take still uses the selected camera when you record.",
+            );
+            self.ensure_meter(&mic, &mic_label, true);
+            self.ensure_meter(&desk, &desk_label, false);
+            return;
+        }
         if !want_cam {
             self.stop_preview();
             match mode {
@@ -383,9 +394,13 @@ impl RecordPage {
         live.cam_key = None;
     }
 
+    pub fn on_hotkey_record(&self, state: &Rc<StudioState>) {
+        self.on_record_clicked(state);
+    }
+
     fn on_record_clicked(&self, state: &Rc<StudioState>) {
         if state.recording.borrow().active {
-            if stop_requires_confirmation() {
+            if stop_requires_confirmation_pref(state.settings.borrow().hotkeys.confirm_stop) {
                 let dialog = adw::AlertDialog::new(
                     Some("Stop recording?"),
                     Some("The MKV is kept. Stopping does not delete the take."),
@@ -427,6 +442,8 @@ impl RecordPage {
         rec.warning = None;
         rec.dropped = None;
         rec.last_message = Some("Status: Starting…".into());
+        rec.last_marker = None;
+        *state.markers.borrow_mut() = MarkerFile::new("pending");
         Ok(())
     }
 
@@ -526,7 +543,15 @@ impl RecordPage {
             self.rec_btn.set_sensitive(true);
             self.rec_btn
                 .set_tooltip_text(Some("Asks for confirmation before stopping"));
-            self.rec_note.set_text("Recording. Stop asks for confirmation. The MKV is never deleted automatically.");
+            let marker = state
+                .recording
+                .borrow()
+                .last_marker
+                .clone()
+                .unwrap_or_else(|| "F8 drops a chapter marker.".into());
+            self.rec_note.set_text(&format!(
+                "Recording. Stop asks for confirmation unless you disabled it. {marker}"
+            ));
             return;
         }
         self.rec_btn.set_label("START RECORDING");
@@ -542,6 +567,44 @@ impl RecordPage {
                 "Camera, Voice, and Creator write an MKV. Creator muxes desktop audio as a second track when a monitor is selected.",
             );
         }
+    }
+
+    pub fn drop_marker(&self, state: &StudioState) {
+        if !state.recording.borrow().active {
+            state.recording.borrow_mut().last_marker =
+                Some("Markers are stored on the current take. Start recording first.".into());
+            return;
+        }
+        let elapsed = state
+            .recording
+            .borrow()
+            .started
+            .map(|t| t.elapsed().as_millis() as u64)
+            .unwrap_or(0);
+        let path = state.recording.borrow().path.clone();
+        let marker = {
+            let mut file = state.markers.borrow_mut();
+            if file.recording_id == "idle" {
+                *file = MarkerFile::new(
+                    path.as_ref()
+                        .and_then(|p| p.file_stem())
+                        .map(|s| s.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| "take".into()),
+                );
+            }
+            let n = file.markers.len() + 1;
+            file.add(elapsed, format!("Marker {n}")).clone()
+        };
+        if let Some(path) = path {
+            let side = MarkerFile::path_for(&path);
+            let _ = state.markers.borrow().save(&side);
+            state.recording.borrow_mut().last_marker = Some(format!(
+                "Marker at {:.1}s · {}",
+                elapsed as f64 / 1000.0,
+                side.display()
+            ));
+        }
+        let _ = marker;
     }
 
     fn alert(&self, title: &str, body: &str) {

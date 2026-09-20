@@ -3,8 +3,9 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use scs_core::{
-    RecordingMode, Settings, SettingsStore, APP_NAME,
+    MarkerFile, RecordingMode, Settings, SettingsStore, APP_NAME,
 };
+use scs_teleprompter::TeleprompterScript;
 use scs_encoder::{capabilities_from_encoder_list, EncoderCapabilities};
 use scs_system::SystemMonitor;
 
@@ -15,6 +16,9 @@ pub struct StudioState {
     pub encoder_status: RefCell<String>,
     pub caps: EncoderCapabilities,
     pub recording: RefCell<RecordingUi>,
+    pub teleprompter: RefCell<TeleprompterScript>,
+    pub markers: RefCell<MarkerFile>,
+    pub camera_preview: std::cell::Cell<bool>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -26,6 +30,7 @@ pub struct RecordingUi {
     pub warning: Option<String>,
     pub dropped: Option<u64>,
     pub last_message: Option<String>,
+    pub last_marker: Option<String>,
 }
 
 impl StudioState {
@@ -41,6 +46,9 @@ impl StudioState {
             encoder_status: RefCell::new(encoder_status),
             caps,
             recording: RefCell::new(RecordingUi::default()),
+            teleprompter: RefCell::new(TeleprompterScript::default()),
+            markers: RefCell::new(MarkerFile::new("idle")),
+            camera_preview: std::cell::Cell::new(true),
         }
     }
 
@@ -115,5 +123,5 @@ fn probe_encoders() -> (EncoderCapabilities, String) {
 }
 
 pub fn app_subtitle() -> String {
-    format!("{APP_NAME} · Milestone 5")
+    format!("{APP_NAME} · Milestone 6")
 }
