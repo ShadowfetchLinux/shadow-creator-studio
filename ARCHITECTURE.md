@@ -27,7 +27,7 @@ recorded in this repository.
 | libadwaita runtime | 1.5+ | Dark shell |
 | libadwaita **dev** | `libadwaita-1-dev` | Needed to compile `scs-ui` |
 | PipeWire | 1.x with Pulse compatibility | Native capture starts in M2 |
-| PipeWire **dev** | `libpipewire-0.3-dev` | Not required for M1 |
+| PipeWire **dev** | `libpipewire-0.3-dev` | Not required; M2 uses `pw-dump` / `pw-record` |
 | FFmpeg | 6.x with `h264_nvenc` when NVIDIA is present | Also used for remux/probe |
 | OBS Studio | Optional in M1 | Primary record engine from M3 via obs-websocket |
 | EasyEffects | Optional | Compatible in concept; never auto-configured |
@@ -157,21 +157,21 @@ are extension points. They do not run in M1 and must not phone home.
 
 Cargo workspace. Small crates, no giant sources.
 
-| Crate | Role | M1 reality |
+| Crate | Role | Current reality |
 | --- | --- | --- |
 | `scs-core` | Settings (XDG JSON), paths, filenames, recording metadata, markers, disk math, config migration, secret redaction | **Implemented + tested** |
 | `scs-system` | Cheap host probes: `/proc`, NVML, `statvfs`, hwmon | **Implemented** (live where cheap) |
-| `scs-audio` | Device + processing-chain types | Types only |
+| `scs-audio` | Device types, peak/average meters, processing-chain model | **Meters implemented + tested**; processing still M4 |
 | `scs-video` | Resolution, FPS, color, format types | Types only |
-| `scs-capture` | Screen / window / camera / composite source types | Types only |
+| `scs-capture` | V4L2 camera listing, display models, inventory | **Cameras + inventory**; window/region unavailable |
 | `scs-encoder` | Encoder capability parsing | Parser + types; detection optional |
-| `scs-pipewire` | Socket / version presence | Detection only |
-| `scs-ffmpeg` | Typed argv builder, remux/record plans | Builder + tests; does not spawn a recorder |
+| `scs-pipewire` | `pw-dump` parse, mic vs desktop split, `pw-record` argv | **Listing + error mapping**; no libpipewire link |
+| `scs-ffmpeg` | Typed argv builder, remux/record plans, camera preview argv | Builder + preview plan; does not spawn a recorder |
 | `scs-obs` | WebSocket client config + install probe | Probe only; no session |
 | `scs-library` | Recording index types | Types + empty UI page |
 | `scs-teleprompter` | Script types | Types + empty UI page |
 | `scs-diagnostics` | Redacted report assembly | **Implemented** |
-| `scs-ui` | GTK4 + libadwaita shell | **Implemented**; needs `-dev` packages to compile |
+| `scs-ui` | GTK4 + libadwaita shell + live preview/meters | **Implemented**; needs `-dev` packages to compile |
 
 Application id: `com.shadowfetch.creatorstudio`  
 Config: `$XDG_CONFIG_HOME/com.shadowfetch.creatorstudio/settings.json`  
@@ -183,17 +183,17 @@ Disabled + labeled. Examples already in the shell:
 
 - START RECORDING — later milestone (M3)
 - GO LIVE — later milestone (M8)
-- Meters — idle until M2
-- Preview canvas — labeled placeholder, not a live camera
+- Window / region capture — labeled unavailable
+- Live desktop frames — selected-display placeholder until portal capture
 - Library / Teleprompter — empty states
-- Wizard device tests — “Unavailable”, never a fake pass
+- Wizard — lists real devices when the background scan finishes; no fake pass
 
 ## Milestone plan
 
 | ID | Name | Includes |
 | --- | --- | --- |
 | **M1** | Application shell | This milestone. Window, navigation, Record page chrome, mode tiles (persisted), Settings structure + restore defaults, Diagnostics (real probes + copy redacted report), first-run wizard shell, system dashboard (cheap live metrics), foundation libraries + tests. **Does not record.** |
-| **M2** | Audio I/O | PipeWire device list, mic + desktop meters, peak/RMS, no silent system-config writes |
+| **M2** | Device discovery + live preview | Cameras (name/resolution/FPS), PipeWire mics, desktop monitors, live camera preview + mirror, peak/average meters + clip, persist last devices/mode. **Does not record.** |
 | **M3** | Recording | OBS WebSocket primary, FFmpeg fallback, NVENC, MKV, timer, start/stop honesty, long-session watchdog |
 | **M4** | Audio processing | HPF → denoise → gate → EQ → compressor → limiter; Natural vs Raw |
 | **M5** | Picture | Screen + webcam composition, layouts, preview (still honest about limits) |
@@ -218,10 +218,18 @@ Disabled + labeled. Examples already in the shell:
 - Persist last recording mode, wizard completion, folder, quality
 - Live CPU / RAM / disk / GPU (NVML) where implementation is cheap and correct
 
+**In M2**
+
+- Background camera / PipeWire discovery
+- Live V4L2 camera preview (FFmpeg RGB24 pipe) with optional hflip
+- Real `pw-record` meters (peak, average, clipping). Never fake a moving bar
+- Display selector from GDK monitors; honest placeholder for screen modes
+- Persist last camera, mic, desktop source, display, mode, and mirror flag
+
 **Explicitly later**
 
 - Any actual recording or streaming
-- Live camera/mic preview and meters
+- Portal / live desktop frames
 - Audio processing
 - OBS WebSocket session
 - Remux, library playback, teleprompter, Whisper, YouTube APIs

@@ -55,11 +55,14 @@ Typical runtimes that go with those headers on Pop!_OS 24.04:
 - `libgtk-4-1` 4.14.x
 - `libadwaita-1-0` 1.5.x
 
-## 3. Packages required for later milestones (not needed to test M1 libraries)
+## 3. Optional packages for later milestones
 
 ```bash
-# M2+ PipeWire headers
+# Native PipeWire headers (not required: M2 uses pw-dump / pw-record)
 sudo apt install libpipewire-0.3-dev
+
+# M2 runtime helpers (usually already present with PipeWire)
+sudo apt install pipewire-bin ffmpeg v4l-utils
 
 # Keyring backend (when stream keys are stored)
 sudo apt install libsecret-1-dev
@@ -131,7 +134,7 @@ The app never writes PipeWire, EasyEffects, or system microphone configuration.
 COSMIC and GNOME on Wayland are supported. Headless CI should run
 `cargo test --workspace --exclude scs-ui --lib` only.
 
-## 8. Minimum apt set for the M1 window
+## 8. Minimum apt set for the window
 
 ```bash
 sudo apt install libgtk-4-dev libadwaita-1-dev

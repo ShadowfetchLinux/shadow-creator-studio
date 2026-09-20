@@ -5,9 +5,8 @@ tutorials, and voice — with a simple creator-focused interface. The long-term
 engine is OBS Studio (via WebSocket) with FFmpeg + NVIDIA NVENC as the
 tooling and fallback path.
 
-**Milestone 1** is the application shell: a polished dark UI, real settings,
-honest unavailable states, and tested foundation libraries. It does **not**
-record or go live yet.
+**Milestone 2** lists cameras and PipeWire audio, shows a live camera preview
+and real meters, and still does **not** record or go live.
 
 ## Screenshots
 
@@ -21,19 +20,16 @@ record or go live yet.
 | Diagnostics | ![Diagnostics](docs/screenshots/diagnostics.png) |
 | First-run wizard | ![Wizard](docs/screenshots/wizard.png) |
 
-## What works in Milestone 1
+## What works in Milestone 2
 
-- Dark, uncluttered Record / Library / Teleprompter / Settings / Diagnostics navigation
-- Recording mode tiles (Camera, Screen, Presentation, Voice, Creator, Custom) — last
-  selection is saved
-- Settings groups with **Restore Recommended Settings**
-- First-run wizard (folder + quality persist; device tests labeled unavailable)
-- Diagnostics assembled **at runtime** on the machine that runs the app (OS, Rust,
-  FFmpeg, PipeWire, GPU via NVML). Do not commit those reports.
-- **Copy Diagnostic Report** with secret redaction
-- System dashboard: live CPU, RAM, disk, and GPU/VRAM/temp when NVML works;
-  em-dash + “Unavailable” otherwise
-- Timestamped filenames, recording metadata, disk estimates (libraries + tests)
+- Everything from Milestone 1 (shell, settings, wizard, diagnostics, dashboard)
+- Camera selector with name, resolution, and pixel format (not raw `/dev/videoN` as the only label)
+- PipeWire microphone and desktop-monitor lists from `pw-dump`
+- Live camera preview in the large preview area, with an optional mirror flip
+- Real-time mic and desktop meters (peak + average) plus a clipping warning
+- Multi-monitor display tiles from the session; window and region capture stay labeled unavailable
+- Last camera, mic, desktop source, display, and recording mode persist in settings
+- Background discovery — the UI does not freeze while probing devices
 
 ## What is intentionally unavailable
 
@@ -41,10 +37,9 @@ record or go live yet.
 | --- | --- |
 | START RECORDING | Available in a later milestone (M3) |
 | GO LIVE | Available in a later milestone (M8) |
-| Camera preview | Placeholder canvas — not a live camera |
-| Mic / desktop meters | Idle until Milestone 2 |
+| Window / region capture | Structured, labeled unavailable |
+| Live desktop frames | Selected-display placeholder (portal capture is later) |
 | Library / Teleprompter | Empty states for M6 / M7 |
-| Wizard device tests | Unavailable — never a fake pass |
 
 ## Dependencies
 
@@ -61,7 +56,7 @@ Foundation crates and tests compile without GTK headers.
 
 ## Install
 
-This repository is the source tree. There is no packaged `.deb` in M1.
+This repository is the source tree. There is no packaged `.deb` yet.
 
 ```bash
 git clone https://github.com/ShadowfetchLinux/shadow-creator-studio.git
@@ -110,11 +105,11 @@ $XDG_VIDEOS_DIR/Shadow Creator Studio
 
 - Target container: **MKV** (crash-safe). Optional remux to MP4 without re-encode
   starts in M6. The MKV is never deleted until the MP4 verifies.
-- Separate audio tracks are the plan (mic vs desktop). Not captured in M1.
+- Separate audio tracks are the plan (mic vs desktop). Not captured yet.
 - Preferred future encoder: **NVIDIA NVENC** (`h264_nvenc`, plus HEVC/AV1 when
   FFmpeg lists them).
 - Primary future record engine: **OBS via obs-websocket**. FFmpeg is remux /
-  probe / fallback. OBS is not required to launch M1.
+  probe / fallback. OBS is not required to launch the studio.
 
 ## Audio
 
@@ -128,16 +123,20 @@ $XDG_VIDEOS_DIR/Shadow Creator Studio
 
 On a machine with an NVIDIA driver and NVENC-capable FFmpeg, the dashboard reads
 GPU load, VRAM, and temperature through NVML when initialization succeeds. It
-does not spawn `nvidia-smi` every tick. Idle encoder rows in M1 are expected.
+does not spawn `nvidia-smi` every tick. Idle encoder rows are expected until M3.
 
-## Known limitations (M1)
+## Known limitations (M2)
 
-- The GUI crate does not compile until `libgtk-4-dev` and `libadwaita-1-dev`
-  are installed.
-- No recording, streaming, live preview, or meters.
+- START RECORDING and GO LIVE stay disabled. Nothing is written to disk.
+- Screen/Presentation modes show the selected display name, not live desktop frames.
+  Portal / PipeWire screen capture is later.
+- Window and region capture are structured types only.
+- Camera preview uses FFmpeg V4L2 → RGB24. If the device is busy or FFmpeg fails,
+  the preview shows a human-readable error instead of a fake frame.
+- Meters use `pw-record` against a PipeWire node. The app never writes WirePlumber,
+  EasyEffects, or default source/sink configuration.
 - Encoder “ready” means FFmpeg advertised the encoder, not that a test encode ran.
 - OBS WebSocket is detected as a binary/plugin at most; no login, no scenes.
-- YouTube Live, captions, and library playback are future milestones.
 
 ## License
 

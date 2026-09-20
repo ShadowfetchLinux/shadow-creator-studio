@@ -1,4 +1,4 @@
-# Troubleshooting (Milestone 1)
+# Troubleshooting
 
 Practical notes for Pop!_OS 24.04 / COSMIC or GNOME / NVIDIA NVENC setups.
 Later milestones should append here instead of inventing a second FAQ.
@@ -70,11 +70,11 @@ If you still see a secret:
 
 1. Treat the clipboard as compromised and rotate that credential.
 2. File a bug with a **redacted** example (never paste the real key).
-3. Do not put stream keys into Settings in M1 — the field is disabled.
+3. Do not put stream keys into Settings — the field is disabled.
 
 ## NVIDIA / NVENC rows look idle
 
-Idle is correct in M1. “NVENC advertised” means FFmpeg listed `h264_nvenc`
+Idle is correct until recording exists. “NVENC advertised” means FFmpeg listed `h264_nvenc`
 (or HEVC/AV1). It is **not** a test encode. A full encode path is M3.
 
 Dashboard GPU numbers come from NVML. If NVML init fails, values are `—` and
@@ -83,13 +83,14 @@ labeled unavailable. Do not add a `nvidia-smi` poll to the 2-second timer.
 ## PipeWire vs PulseAudio
 
 `pactl info` showing `PulseAudio (on PipeWire …)` is normal. The server is
-PipeWire. M2 will prefer native PipeWire; Pulse remains a fallback.
+PipeWire. Device listing uses `pw-dump`; meters use `pw-record --target <node>`.
+Pulse remains a compatibility path.
 
-This app must not rewrite default sources/sinks in M1.
+This app must not rewrite default sources/sinks.
 
 ## OBS is installed but the app says recording is unavailable
 
-Correct for M1. Recording starts in M3. Prefer a single OBS install and enable
+Correct until Milestone 3. Prefer a single OBS install and enable
 obs-websocket when that milestone lands.
 
 ## EasyEffects is missing
@@ -117,6 +118,27 @@ cargo test --workspace --exclude scs-ui --lib
 After installing `-dev` packages, a first `cargo build -p scs-ui` downloads
 a large gtk-rs graph. That is expected. Warnings inside generated bindings
 are upstream; fix only warnings in this repository’s sources.
+
+## Camera preview is empty or shows an error
+
+Honest. Common causes:
+
+- The camera is open in another app (`busy`).
+- FFmpeg is missing or cannot open V4L2.
+- The selected `/dev/videoN` node has no usable format (metadata-only nodes are skipped).
+
+The preview never invents frames. Switch cameras on the Record page or close the other app.
+
+## Meters stay at zero or show an error
+
+Meters read raw s16 from `pw-record`. Install `pipewire-bin` if `pw-record` is missing.
+A silent bar at −60 dB is real silence. A red **Clipping** label is real peak ≥ 0.99.
+The app never writes WirePlumber or EasyEffects configuration to “fix” a quiet mic.
+
+## Desktop audio device is missing
+
+Desktop meters need a PipeWire monitor source (or `{sink}.monitor`). If none is
+reported, the dropdown says so. Screen live frames are a later milestone.
 
 ## Never do these
 
