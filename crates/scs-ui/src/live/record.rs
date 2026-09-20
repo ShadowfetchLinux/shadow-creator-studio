@@ -8,10 +8,11 @@ use std::thread;
 use std::time::Duration;
 
 use scs_ffmpeg::{
-    human_ffmpeg_error, parse_progress_block, plan_record, remux_command, verify_media,
-    RecordPlanRequest,
+    human_ffmpeg_error, parse_progress_block, plan_desktop_record, plan_record, remux_command,
+    verify_media, DesktopVideoInput, GstPip, RecordPlanRequest,
 };
 use scs_library::{write_sidecar, Sidecar};
+use scs_obs::{ObsConnectionConfig, ObsSession};
 
 #[derive(Debug)]
 pub enum RecordEvent {
@@ -20,6 +21,43 @@ pub enum RecordEvent {
     Warning(String),
     Finished { message: String, remuxed: Option<PathBuf> },
     Failed(String),
+}
+
+pub fn start_desktop_session(
+    input: DesktopVideoInput,
+    mic: Option<String>,
+    pip: Option<GstPip>,
+    output: PathBuf,
+    prefer_nvenc: bool,
+    rtmp_url: Option<String>,
+    remux: bool,
+    stop: Arc<AtomicBool>,
+) -> Receiver<RecordEvent> {
+    let (tx, rx) = mpsc::channel();
+    thread::Builder::new()
+        .name("scs-gst-record".into())
+        .spawn(move || {
+            if let Err(err) = run_desktop_session(
+                input, mic, pip, output, prefer_nvenc, rtmp_url, remux, stop, &tx,
+            ) {
+                let _ = tx.send(RecordEvent::Failed(err));
+            }
+        })
+        .ok();
+    rx
+}
+
+pub fn start_obs_session(stream: bool, stop: Arc<AtomicBool>) -> Receiver<RecordEvent> {
+    let (tx, rx) = mpsc::channel();
+    thread::Builder::new()
+        .name("scs-obs-record".into())
+        .spawn(move || {
+            if let Err(err) = run_obs_session(stream, stop, &tx) {
+                let _ = tx.send(RecordEvent::Failed(err));
+            }
+        })
+        .ok();
+    rx
 }
 
 pub fn start_session(
@@ -162,6 +200,163 @@ fn run_session(
     }
     write_take_sidecar(&mkv, &request);
     let _ = tx.send(RecordEvent::Finished { message, remuxed });
+    Ok(())
+}
+
+fn run_desktop_session(
+    input: DesktopVideoInput,
+    mic: Option<String>,
+    pip: Option<GstPip>,
+    output: PathBuf,
+    prefer_nvenc: bool,
+    rtmp_url: Option<String>,
+    remux: bool,
+    stop: Arc<AtomicBool>,
+    tx: &std::sync::mpsc::Sender<RecordEvent>,
+) -> Result<(), String> {
+    if !scs_ffmpeg::gst_available() {
+        return Err("gst-launch-1.0 is not installed, so desktop recording cannot start.".into());
+    }
+    let plan = plan_desktop_record(
+        &input,
+        mic.as_deref(),
+        pip.as_ref(),
+        &output,
+        prefer_nvenc,
+        rtmp_url.as_deref(),
+    );
+    let mut command = Command::new(&plan.program);
+    command.args(&plan.args);
+    command.stdin(Stdio::null());
+    command.stdout(Stdio::null());
+    command.stderr(Stdio::piped());
+    let mut child = command.spawn().map_err(|err| {
+        if err.kind() == std::io::ErrorKind::NotFound {
+            "gst-launch-1.0 is not installed, so desktop recording cannot start.".into()
+        } else {
+            format!("Could not start GStreamer: {err}")
+        }
+    })?;
+    let encoder = if prefer_nvenc {
+        "nvh264enc"
+    } else {
+        "x264enc"
+    };
+    let _ = tx.send(RecordEvent::Started {
+        path: output.clone(),
+        encoder: encoder.into(),
+    });
+    let err_buf = Arc::new(std::sync::Mutex::new(String::new()));
+    if let Some(stderr) = child.stderr.take() {
+        let err_buf = Arc::clone(&err_buf);
+        thread::spawn(move || {
+            let mut reader = BufReader::new(stderr);
+            let mut line = String::new();
+            while reader.read_line(&mut line).unwrap_or(0) > 0 {
+                if let Ok(mut buf) = err_buf.lock() {
+                    if buf.len() < 4000 {
+                        buf.push_str(&line);
+                    }
+                }
+                line.clear();
+            }
+        });
+    }
+    let mut frames = 0u64;
+    while !stop.load(Ordering::Relaxed) {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) => {
+                frames += 1;
+                let _ = tx.send(RecordEvent::Progress {
+                    frame: frames,
+                    out_time_ms: frames * 250,
+                    drop_frames: None,
+                });
+                thread::sleep(Duration::from_millis(250));
+            }
+            Err(_) => break,
+        }
+    }
+    if stop.load(Ordering::Relaxed) {
+        let _ = child.kill();
+    }
+    let _ = child.wait();
+    if !output.exists() {
+        let stderr_text = err_buf.lock().map(|s| s.clone()).unwrap_or_default();
+        return Err(if stderr_text.trim().is_empty() {
+            "GStreamer exited before a file was written.".into()
+        } else {
+            format!(
+                "Desktop record failed: {}",
+                stderr_text.lines().next().unwrap_or("gstreamer error")
+            )
+        });
+    }
+    let mut message = format!("Saved {}", file_name(&output));
+    let mut remuxed = None;
+    if remux {
+        match remux_take(&output) {
+            Ok(path) => {
+                remuxed = Some(path);
+                message = format!(
+                    "Saved {} and a verified MP4 copy. The MKV was kept.",
+                    file_name(&output)
+                );
+            }
+            Err(err) => {
+                let _ = tx.send(RecordEvent::Warning(err));
+            }
+        }
+    }
+    let _ = tx.send(RecordEvent::Finished { message, remuxed });
+    Ok(())
+}
+
+fn run_obs_session(
+    stream: bool,
+    stop: Arc<AtomicBool>,
+    tx: &std::sync::mpsc::Sender<RecordEvent>,
+) -> Result<(), String> {
+    let password = match scs_core::lookup_obs_password() {
+        Ok(pw) => pw,
+        Err(err) => {
+            if err.contains("secret-tool") {
+                None
+            } else {
+                return Err(err);
+            }
+        }
+    };
+    let mut session = ObsSession::connect(&ObsConnectionConfig::default(), password.as_deref())?;
+    if stream {
+        session.start_stream()?;
+    } else {
+        session.start_record()?;
+    }
+    let _ = tx.send(RecordEvent::Started {
+        path: PathBuf::from("OBS output folder"),
+        encoder: "OBS WebSocket".into(),
+    });
+    while !stop.load(Ordering::Relaxed) {
+        thread::sleep(Duration::from_millis(250));
+    }
+    let stop_result = if stream {
+        session.stop_stream()
+    } else {
+        session.stop_record()
+    };
+    if let Err(err) = stop_result {
+        let _ = tx.send(RecordEvent::Warning(err));
+    }
+    let _ = tx.send(RecordEvent::Finished {
+        message: if stream {
+            "OBS stream stopped.".into()
+        } else {
+            "OBS recording stopped. The file is in the OBS recordings folder.".into()
+        },
+        remuxed: None,
+    });
     Ok(())
 }
 

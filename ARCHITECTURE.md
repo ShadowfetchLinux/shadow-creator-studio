@@ -29,7 +29,7 @@ recorded in this repository.
 | PipeWire | 1.x with Pulse compatibility | Native capture starts in M2 |
 | PipeWire **dev** | `libpipewire-0.3-dev` | Not required; M2 uses `pw-dump` / `pw-record` |
 | FFmpeg | 6.x with `h264_nvenc` when NVIDIA is present | Also used for remux/probe |
-| OBS Studio | Optional | Planned primary record engine via obs-websocket (later). M3 uses FFmpeg |
+| OBS Studio | Optional | WebSocket v5 can StartRecord/StartStream when OBS is already running |
 | EasyEffects | Optional | Compatible in concept; never auto-configured |
 | libsecret | Runtime later for stream keys | Dev package when the keyring backend lands |
 
@@ -159,15 +159,15 @@ Cargo workspace. Small crates, no giant sources.
 
 | Crate | Role | Current reality |
 | --- | --- | --- |
-| `scs-core` | Settings, paths, filenames, markers, secrets, extension registry, local jobs | **M8 registry + local jobs tested** |
+| `scs-core` | Settings, paths, filenames, markers, secrets, extension registry, local jobs | **Implemented** |
 | `scs-system` | Cheap host probes: `/proc`, NVML, `statvfs`, hwmon | **Implemented** (live where cheap) |
 | `scs-audio` | Devices, meters, track layout, FFmpeg filter graph, calibration | **M4 implemented + tested** |
 | `scs-video` | Resolution, FPS, color, format types | Types only |
-| `scs-capture` | V4L2 camera listing, display models, inventory | **Cameras + inventory**; window/region unavailable |
+| `scs-capture` | V4L2 cameras, portal stream types, PIP corners | **Cameras + portal stream model**; region unavailable |
 | `scs-encoder` | Encoder capability parsing | Parser + types; detection optional |
 | `scs-pipewire` | `pw-dump` parse, mic vs desktop split, `pw-record` argv | **Listing + error mapping**; no libpipewire link |
-| `scs-ffmpeg` | Typed argv builder, remux/record plans, camera preview argv | Record plans include filter_complex pad graphs |
-| `scs-obs` | WebSocket client config + install probe | Probe only; no session |
+| `scs-ffmpeg` | Typed argv builder, remux/record plans, GStreamer desktop argv | Camera/Voice via FFmpeg; Screen via gst-launch |
+| `scs-obs` | Install probe + WebSocket v5 Identify / StartRecord / StartStream | Optional engine; password from keyring |
 | `scs-library` | Folder index, sidecar metadata, delete confirm | **M5 implemented + tested** |
 | `scs-teleprompter` | Script, font/speed bounds, scroll math | **M6 implemented + tested** |
 | `scs-diagnostics` | Redacted report assembly | **Implemented** |

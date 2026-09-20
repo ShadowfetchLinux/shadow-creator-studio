@@ -57,7 +57,7 @@ That is intentional. M1 only reports probes that exist on the machine that
 | FFmpeg | `ffmpeg -version` (once) |
 | PipeWire | `pipewire --version` and the runtime socket |
 | GPU | NVML first; never a dashboard `nvidia-smi` loop |
-| OBS | binary on `PATH`; websocket **not** connected |
+| OBS | binary on `PATH`; WebSocket used only when you pick that engine |
 | EasyEffects | `PATH` only |
 
 If a detector is not implemented, the UI shows **Unavailable** — not a green
@@ -70,7 +70,7 @@ If you still see a secret:
 
 1. Treat the clipboard as compromised and rotate that credential.
 2. File a bug with a **redacted** example (never paste the real key).
-3. Do not put stream keys into Settings — the field is disabled.
+3. Store stream keys only via **Store in keyring**. Never paste them into issues.
 
 ## NVIDIA / NVENC rows look idle
 
@@ -92,14 +92,17 @@ This app must not rewrite default sources/sinks.
 
 - Camera and Creator need a camera **and** a microphone.
 - Voice needs a microphone.
-- Screen / Presentation do not record yet.
+- Screen / Presentation need **Share screen** (xdg-desktop-portal) and `gst-launch-1.0`.
+- If the portal dialog never appears, check `xdg-desktop-portal` and the COSMIC/GNOME portal.
 - The recordings folder must have more than 1 GiB free.
 - If the camera is in another app, close it — preview pauses during a take so FFmpeg can open V4L2.
 
 ## OBS is installed but the take uses FFmpeg
 
-Correct in Milestone 3. OBS via obs-websocket is the later primary engine. Prefer a single OBS install and enable
-obs-websocket when that milestone lands.
+Default **Auto** uses the portal + GStreamer for Screen and FFmpeg for camera.
+Set **Recording engine** to OBS WebSocket only after OBS is running with the
+WebSocket server enabled. Store the password in the keyring. This app does not
+rewrite OBS configs. If Identify fails, switch back to Auto.
 
 ## EasyEffects is missing
 
@@ -146,7 +149,28 @@ The app never writes WirePlumber or EasyEffects configuration to “fix” a qui
 ## Desktop audio device is missing
 
 Desktop meters need a PipeWire monitor source (or `{sink}.monitor`). If none is
-reported, the dropdown says so. Screen live frames are a later milestone.
+reported, the dropdown says so. Screen live frames appear after you grant a
+portal share.
+
+## GO LIVE stays disabled
+
+The button needs a keyring-backed stream key and an FFmpeg `flv` muxer (or OBS
+in OBS-engine mode). If store fails:
+
+```bash
+sudo apt install libsecret-tools
+```
+
+The stream key is never written to `settings.json` and never logged.
+
+## Global hotkeys do nothing when the window is unfocused
+
+COSMIC does not expose a GlobalShortcuts portal. In-app F-keys work while focused.
+Bind a COSMIC Custom Shortcut to:
+
+```text
+shadow-creator-studio --action start-stop
+```
 
 ## Never do these
 

@@ -1,6 +1,7 @@
 pub mod jobs;
 pub mod meters;
 pub mod plan;
+pub mod portal;
 pub mod preview;
 pub mod record;
 

@@ -27,3 +27,4 @@ scs-pipewire.workspace = true
 scs-system.workspace = true
 scs-teleprompter.workspace = true
 scs-video.workspace = true
+rustix.workspace = true

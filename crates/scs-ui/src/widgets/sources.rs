@@ -32,13 +32,29 @@ impl SourceSelector {
         displays.add_css_class("scs-source-row");
 
         let extra = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        extra.append(&unavailable_card(
-            "Window",
-            DesktopOption::window_unavailable()
+        let window_toggle = gtk::ToggleButton::new();
+        window_toggle.add_css_class("scs-mode-tile");
+        let win_inner = gtk::Box::new(gtk::Orientation::Vertical, 2);
+        let win_title = gtk::Label::new(Some("Window"));
+        win_title.add_css_class("scs-mode-title");
+        let win_sub = gtk::Label::new(Some(
+            DesktopOption::window_via_portal()
                 .reason
                 .as_deref()
-                .unwrap_or(""),
+                .unwrap_or("Portal picker"),
         ));
+        win_sub.add_css_class("caption");
+        win_sub.set_wrap(true);
+        win_inner.append(&win_title);
+        win_inner.append(&win_sub);
+        window_toggle.set_child(Some(&win_inner));
+        window_toggle.set_active(state.settings.borrow().video.window_capture);
+        let state_w = Rc::clone(state);
+        window_toggle.connect_toggled(move |btn| {
+            state_w.settings.borrow_mut().video.window_capture = btn.is_active();
+            let _ = state_w.persist();
+        });
+        extra.append(&window_toggle);
         extra.append(&unavailable_card(
             "Region",
             DesktopOption::region_unavailable()

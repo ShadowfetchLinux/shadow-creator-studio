@@ -1,11 +1,13 @@
 //! Capture sources: cameras, displays, and composite layouts.
 
+mod desktop;
 mod display;
 mod error;
 mod formats;
 mod inventory;
 mod v4l2;
 
+pub use desktop::{parse_stream_props, DesktopStream, PipCorner, PipSpec, SOURCE_MONITOR, SOURCE_WINDOW};
 pub use display::{DesktopKind, DesktopOption, DisplaySource};
 pub use error::CaptureError;
 pub use formats::parse_v4l2_list_formats;

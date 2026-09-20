@@ -2,6 +2,7 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 
 pub const STREAM_KEY_ATTR: &str = "youtube-stream";
+pub const OBS_PASSWORD_ATTR: &str = "obs-websocket";
 const SERVICE: &str = "com.shadowfetch.creatorstudio";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,14 +30,22 @@ pub fn detect_backend() -> SecretBackend {
 }
 
 pub fn lookup_stream_key() -> Result<Option<String>, String> {
+    lookup_secret(STREAM_KEY_ATTR)
+}
+
+pub fn lookup_obs_password() -> Result<Option<String>, String> {
+    lookup_secret(OBS_PASSWORD_ATTR)
+}
+
+fn lookup_secret(attr: &str) -> Result<Option<String>, String> {
     match detect_backend() {
         SecretBackend::Missing => Err(
-            "libsecret CLI (secret-tool) is not installed. The stream key is not stored in settings.json."
+            "secret-tool is not installed. Install it with: sudo apt install libsecret-tools. Secrets are never written to settings.json."
                 .into(),
         ),
         SecretBackend::SecretTool => {
             let out = Command::new("secret-tool")
-                .args(["lookup", "service", SERVICE, "key", STREAM_KEY_ATTR])
+                .args(["lookup", "service", SERVICE, "key", attr])
                 .output()
                 .map_err(|e| format!("secret-tool failed: {e}"))?;
             if !out.status.success() {
@@ -53,20 +62,31 @@ pub fn lookup_stream_key() -> Result<Option<String>, String> {
 }
 
 pub fn store_stream_key(key: &str) -> Result<(), String> {
-    if key.trim().is_empty() {
-        return Err("Stream key is empty.".into());
+    store_secret(STREAM_KEY_ATTR, "Shadow Creator Studio YouTube", key)
+}
+
+pub fn store_obs_password(password: &str) -> Result<(), String> {
+    store_secret(OBS_PASSWORD_ATTR, "Shadow Creator Studio OBS", password)
+}
+
+fn store_secret(attr: &str, label: &str, value: &str) -> Result<(), String> {
+    if value.trim().is_empty() {
+        return Err("Secret is empty.".into());
     }
     if detect_backend() == SecretBackend::Missing {
-        return Err("secret-tool is not installed. The key was not written to disk.".into());
+        return Err(
+            "secret-tool is not installed. Install it with: sudo apt install libsecret-tools. The value was not written to disk."
+                .into(),
+        );
     }
     let mut child = Command::new("secret-tool")
         .args([
             "store",
-            "--label=Shadow Creator Studio YouTube",
+            &format!("--label={label}"),
             "service",
             SERVICE,
             "key",
-            STREAM_KEY_ATTR,
+            attr,
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
@@ -75,14 +95,14 @@ pub fn store_stream_key(key: &str) -> Result<(), String> {
         .map_err(|e| format!("Could not start secret-tool: {e}"))?;
     if let Some(mut stdin) = child.stdin.take() {
         stdin
-            .write_all(key.as_bytes())
-            .map_err(|e| format!("Could not write the key: {e}"))?;
+            .write_all(value.as_bytes())
+            .map_err(|e| format!("Could not write the secret: {e}"))?;
     }
     let status = child.wait().map_err(|e| e.to_string())?;
     if status.success() {
         Ok(())
     } else {
-        Err("secret-tool did not store the key.".into())
+        Err("secret-tool did not store the secret.".into())
     }
 }
 

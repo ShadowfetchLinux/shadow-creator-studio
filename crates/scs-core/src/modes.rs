@@ -45,21 +45,16 @@ impl RecordingMode {
         }
     }
 
-    /// Modes that actually write a file in Milestone 3.
     pub fn records_locally(self) -> bool {
-        matches!(
-            self,
-            Self::Camera | Self::Voice | Self::Creator | Self::Custom
-        )
+        true
+    }
+
+    pub fn needs_desktop_share(self) -> bool {
+        matches!(self, Self::Screen | Self::Presentation)
     }
 
     pub fn unavailable_reason(self) -> Option<&'static str> {
-        match self {
-            Self::Screen | Self::Presentation => Some(
-                "Desktop capture is not recorded yet. A portal/PipeWire grab would be required; this session will not fake a screen take.",
-            ),
-            _ => None,
-        }
+        None
     }
 }
 
@@ -76,9 +71,10 @@ mod tests {
     }
 
     #[test]
-    fn m3_modes_are_honest() {
+    fn screen_and_presentation_record() {
         assert!(RecordingMode::Camera.records_locally());
-        assert!(RecordingMode::Voice.records_locally());
-        assert!(RecordingMode::Screen.unavailable_reason().is_some());
+        assert!(RecordingMode::Screen.records_locally());
+        assert!(RecordingMode::Presentation.needs_desktop_share());
+        assert!(RecordingMode::Screen.unavailable_reason().is_none());
     }
 }

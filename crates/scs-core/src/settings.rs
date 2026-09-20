@@ -82,6 +82,8 @@ pub struct VideoSettings {
     pub fps: u32,
     pub display_id: Option<String>,
     pub display_label: Option<String>,
+    pub pip_corner: String,
+    pub window_capture: bool,
 }
 
 impl Default for VideoSettings {
@@ -92,6 +94,8 @@ impl Default for VideoSettings {
             fps: 60,
             display_id: None,
             display_label: None,
+            pip_corner: "bottom_right".into(),
+            window_capture: false,
         }
     }
 }

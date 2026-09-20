@@ -20,6 +20,8 @@ pub struct StudioState {
     pub markers: RefCell<MarkerFile>,
     pub camera_preview: std::cell::Cell<bool>,
     pub muxers: RefCell<String>,
+    pub desktop_share: RefCell<Option<crate::live::portal::SharedDesktop>>,
+    pub desktop_note: RefCell<Option<String>>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -51,6 +53,8 @@ impl StudioState {
             markers: RefCell::new(MarkerFile::new("idle")),
             camera_preview: std::cell::Cell::new(true),
             muxers: RefCell::new(probe_muxers()),
+            desktop_share: RefCell::new(None),
+            desktop_note: RefCell::new(None),
         }
     }
 
@@ -134,5 +138,5 @@ fn probe_muxers() -> String {
 }
 
 pub fn app_subtitle() -> String {
-    format!("{APP_NAME} · Milestone 8")
+    format!("{APP_NAME} · 0.1")
 }

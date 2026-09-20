@@ -38,11 +38,19 @@ pub struct DesktopOption {
 }
 
 impl DesktopOption {
+    pub fn window_via_portal() -> Self {
+        Self {
+            kind: DesktopKind::Window,
+            available: true,
+            reason: Some("Uses the desktop portal picker (window).".into()),
+        }
+    }
+
     pub fn window_unavailable() -> Self {
         Self {
             kind: DesktopKind::Window,
             available: false,
-            reason: Some("Window capture arrives in a later milestone.".into()),
+            reason: Some("This portal does not list window capture.".into()),
         }
     }
 
@@ -50,7 +58,7 @@ impl DesktopOption {
         Self {
             kind: DesktopKind::Region,
             available: false,
-            reason: Some("Region capture arrives in a later milestone.".into()),
+            reason: Some("Region capture is not offered by the COSMIC portal.".into()),
         }
     }
 }

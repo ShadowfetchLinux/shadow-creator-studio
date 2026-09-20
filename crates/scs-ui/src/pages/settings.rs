@@ -2,7 +2,8 @@ use std::rc::Rc;
 
 use adw::prelude::*;
 use scs_core::quality::QualityPreset;
-use scs_core::settings::{AudioProcessingPreset, EncoderPreference};
+use scs_core::settings::{AudioProcessingPreset, EncoderPreference, EnginePreference};
+use scs_capture::PipCorner;
 use scs_encoder::listed_hardware;
 
 use crate::state::StudioState;
@@ -55,7 +56,9 @@ fn video_group(state: &Rc<StudioState>) -> adw::PreferencesGroup {
     let settings = state.settings.borrow();
     let group = adw::PreferencesGroup::new();
     group.set_title("Video");
-    group.set_description(Some("Canvas follows the recording quality preset."));
+    group.set_description(Some(
+        "Canvas follows the recording quality preset. Presentation PIP uses a corner preset.",
+    ));
 
     let picture = adw::ActionRow::builder()
         .title("Output picture")
@@ -65,6 +68,28 @@ fn video_group(state: &Rc<StudioState>) -> adw::PreferencesGroup {
         ))
         .build();
     group.add(&picture);
+
+    let corners: Vec<&str> = PipCorner::ALL.iter().map(|c| c.label()).collect();
+    let model = gtk::StringList::new(&corners);
+    let pip = adw::ComboRow::builder()
+        .title("Presentation PIP corner")
+        .subtitle("Webcam overlay on the shared desktop")
+        .model(&model)
+        .build();
+    let current = PipCorner::from_key(&settings.video.pip_corner);
+    let idx = PipCorner::ALL
+        .iter()
+        .position(|c| *c == current)
+        .unwrap_or(0);
+    pip.set_selected(idx as u32);
+    let state_p = Rc::clone(state);
+    pip.connect_selected_notify(move |row| {
+        if let Some(corner) = PipCorner::ALL.get(row.selected() as usize) {
+            state_p.settings.borrow_mut().video.pip_corner = corner.key().into();
+            let _ = state_p.persist();
+        }
+    });
+    group.add(&pip);
     group
 }
 
@@ -273,7 +298,7 @@ fn streaming_group(state: &Rc<StudioState>) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::new();
     group.set_title("Streaming");
     group.set_description(Some(
-        "YouTube RTMP/RTMPS. The key is stored with secret-tool (libsecret), never in settings.json, and never logged.",
+        "YouTube RTMP/RTMPS. The key is stored with secret-tool (libsecret), never in settings.json, and never logged. If Store in keyring fails, install: sudo apt install libsecret-tools",
     ));
 
     let platform = adw::ActionRow::builder()
@@ -357,7 +382,7 @@ fn hotkeys_group(state: &Rc<StudioState>) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::new();
     group.set_title("Hotkeys");
     group.set_description(Some(
-        "In-app only. Global shortcuts are unavailable on this COSMIC/Wayland session without a compositor portal (no root hooks).",
+        "In-app shortcuts always work while this window is focused. COSMIC has no GlobalShortcuts portal. Bind a Custom Shortcut to: shadow-creator-studio --action start-stop (also: marker, mute-mic, toggle-camera). No root evdev grab.",
     ));
     let keys = state.settings.borrow().hotkeys.clone();
     for (title, value) in [
@@ -392,11 +417,50 @@ fn hotkeys_group(state: &Rc<StudioState>) -> adw::PreferencesGroup {
 fn advanced_group(state: &Rc<StudioState>) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::new();
     group.set_title("Advanced");
-    let engine = adw::ActionRow::builder()
+    let engine_model = gtk::StringList::new(&[
+        "Auto (portal/GStreamer for screen, FFmpeg for camera)",
+        "OBS WebSocket (current OBS scene)",
+        "FFmpeg / GStreamer only",
+    ]);
+    let engine = adw::ComboRow::builder()
         .title("Recording engine")
-        .subtitle("FFmpeg in Milestone 3. OBS WebSocket is the later primary engine.")
+        .subtitle("OBS records whatever scene is already open. This app never writes secrets into OBS configs.")
+        .model(&engine_model)
         .build();
+    engine.set_selected(match state.settings.borrow().advanced.engine {
+        EnginePreference::Auto => 0,
+        EnginePreference::Obs => 1,
+        EnginePreference::Ffmpeg => 2,
+    });
+    let state_en = Rc::clone(state);
+    engine.connect_selected_notify(move |row| {
+        state_en.settings.borrow_mut().advanced.engine = match row.selected() {
+            1 => EnginePreference::Obs,
+            2 => EnginePreference::Ffmpeg,
+            _ => EnginePreference::Auto,
+        };
+        let _ = state_en.persist();
+    });
     group.add(&engine);
+
+    let obs_pw = adw::PasswordEntryRow::builder()
+        .title("OBS WebSocket password")
+        .build();
+    let save_obs = gtk::Button::with_label("Store in keyring");
+    save_obs.add_css_class("flat");
+    let obs_entry = obs_pw.clone();
+    let state_o = Rc::clone(state);
+    save_obs.connect_clicked(move |_| {
+        let value = obs_entry.text().to_string();
+        match scs_core::store_obs_password(&value) {
+            Ok(()) => obs_entry.set_text(""),
+            Err(err) => {
+                state_o.recording.borrow_mut().last_message = Some(err);
+            }
+        }
+    });
+    obs_pw.add_suffix(&save_obs);
+    group.add(&obs_pw);
 
     let listed = listed_hardware(&state.caps);
     let hardware = if listed.is_empty() {

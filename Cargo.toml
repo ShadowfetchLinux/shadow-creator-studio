@@ -58,6 +58,6 @@ chrono = { version = "0.4", features = ["serde", "clock"] }
 dirs = "6"
 tempfile = "3"
 uuid = { version = "1", features = ["v4", "serde"] }
-rustix = { version = "1", features = ["fs"] }
+rustix = { version = "1", features = ["fs", "stdio"] }
 regex = "1"
 nvml-wrapper = "0.10"

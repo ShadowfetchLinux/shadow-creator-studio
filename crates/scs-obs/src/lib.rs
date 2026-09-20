@@ -1,3 +1,7 @@
+mod client;
+
+pub use client::{auth_string, probe, ObsEngineStatus, ObsSession};
+
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};

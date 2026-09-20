@@ -281,6 +281,21 @@ pub fn probe_command(input: impl AsRef<Path>) -> PlannedCommand {
     }
 }
 
+pub fn silence_remove(input: impl AsRef<Path>) -> ToolJob {
+    let input = input.as_ref();
+    let output = dest(input, "nosilence", ext_of(input, "mkv"));
+    ToolJob {
+        command: base(input)
+            .arg("-af")
+            .arg("silenceremove=stop_periods=-1:stop_duration=0.8:stop_threshold=-40dB")
+            .arg("-c:v")
+            .arg("copy")
+            .output(&output)
+            .build(),
+        output,
+    }
+}
+
 pub fn silence_detect_args(input: impl AsRef<Path>) -> PlannedCommand {
     FfmpegCommandBuilder::new()
         .hide_banner()

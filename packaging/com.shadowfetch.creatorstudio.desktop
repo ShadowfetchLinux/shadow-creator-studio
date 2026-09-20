@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Shadow Creator Studio
+Comment=Linux creator studio for screen, camera, and YouTube-quality recording
+Exec=shadow-creator-studio
+Icon=com.shadowfetch.creatorstudio
+Terminal=false
+Type=Application
+Categories=AudioVideo;Video;Recorder;
+StartupWMClass=com.shadowfetch.creatorstudio
+Keywords=record;screen;webcam;youtube;obs;ffmpeg;

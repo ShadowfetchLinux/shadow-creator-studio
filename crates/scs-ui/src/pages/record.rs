@@ -7,8 +7,10 @@ use std::sync::Arc;
 use adw::prelude::*;
 use gtk::gdk::prelude::MonitorExt;
 use gtk::gio::prelude::ListModelExt;
-use scs_capture::{DeviceInventory, DisplaySource};
+use scs_capture::{DeviceInventory, DisplaySource, PipCorner, PipSpec};
 use scs_core::RecordingMode;
+use scs_core::settings::EnginePreference;
+use scs_ffmpeg::{DesktopVideoInput, GstPip};
 use scs_system::SystemSnapshot;
 
 use crate::live::meters::{self as meter_live, MeterEvent};
@@ -38,6 +40,11 @@ pub struct RecordPage {
     rec_rx: RefCell<Option<Receiver<RecordEvent>>>,
     tracks: tracks::TrackMixer,
     last_mic_peak: Cell<f32>,
+    share_btn: gtk::Button,
+    share_note: gtk::Label,
+    portal_rx: RefCell<Option<Receiver<Result<crate::live::portal::SharedDesktop, String>>>>,
+    pending_record: Cell<bool>,
+    pending_live: Cell<bool>,
 }
 
 struct LiveSessions {
@@ -100,8 +107,20 @@ impl RecordPage {
         rec.add_css_class("destructive-action");
         rec.set_halign(gtk::Align::Center);
 
+        let share_btn = gtk::Button::with_label("Share screen");
+        share_btn.set_halign(gtk::Align::Center);
+        share_btn.set_tooltip_text(Some(
+            "Opens the desktop portal so Screen and Presentation can capture a monitor or window.",
+        ));
+        let share_note = gtk::Label::new(Some(
+            "Screen and Presentation use xdg-desktop-portal + GStreamer (PipeWire). Region capture is not offered.",
+        ));
+        share_note.add_css_class("scs-unavailable");
+        share_note.set_halign(gtk::Align::Center);
+        share_note.set_wrap(true);
+
         let rec_note = gtk::Label::new(Some(
-            "Camera, Voice, and Creator write an MKV. Screen and Presentation stay unavailable.",
+            "Camera, Voice, and Creator write an MKV. Screen and Presentation use the desktop portal.",
         ));
         rec_note.add_css_class("scs-unavailable");
         rec_note.set_halign(gtk::Align::Center);
@@ -140,6 +159,8 @@ impl RecordPage {
         column.append(&meters.root);
         column.append(&tracks.root);
         column.append(&status.root);
+        column.append(&share_btn);
+        column.append(&share_note);
         column.append(&rec);
         column.append(&rec_note);
         column.append(&live_card);
@@ -169,6 +190,11 @@ impl RecordPage {
             rec_rx: RefCell::new(None),
             tracks,
             last_mic_peak: Cell::new(-90.0),
+            share_btn,
+            share_note,
+            portal_rx: RefCell::new(None),
+            pending_record: Cell::new(false),
+            pending_live: Cell::new(false),
         }
     }
 
@@ -190,19 +216,35 @@ impl RecordPage {
         self.tracks.calibrate.connect_clicked(move |_| {
             page_k.calibrate_mic(&state_k);
         });
+        let page_s = Rc::clone(page);
+        let state_s = Rc::clone(state);
+        self.share_btn.connect_clicked(move |_| {
+            page_s.begin_share(&state_s, false, false);
+        });
         self.refresh_record_chrome(state);
         self.refresh_live_chrome(state);
     }
 
     fn start_live(&self, state: &Rc<StudioState>) -> Result<(), String> {
         if state.recording.borrow().active {
-            return Err("Stop the current take first. Live uses a new FFmpeg tee session.".into());
+            return Err("Stop the current take first. Live uses a new session.".into());
+        }
+        if state.settings.borrow().advanced.engine == EnginePreference::Obs {
+            return self.start_obs(state, true);
         }
         let key = scs_core::lookup_stream_key()?.ok_or_else(|| {
             "Store a YouTube stream key in Settings (system keyring) first.".to_string()
         })?;
         let streaming = state.settings.borrow().streaming.clone();
         let url = scs_ffmpeg::build_rtmp_url(&streaming.server_url, &key, streaming.rtmps)?;
+        let mode = state.settings.borrow().last_recording_mode;
+        if mode.needs_desktop_share() {
+            if state.desktop_share.borrow().is_none() {
+                self.begin_share(state, false, true);
+                return Ok(());
+            }
+            return self.start_desktop_take(state, Some(url));
+        }
         let disk = state.monitor.borrow_mut().snapshot().disk;
         let request = crate::live::plan::attach_stream(
             plan::build_request(state, &self.inventory.borrow(), disk)?,
@@ -213,13 +255,8 @@ impl RecordPage {
         self.stop_preview();
         let stop = Arc::new(AtomicBool::new(false));
         let rx = rec_live::start_session(request, remux, Arc::clone(&stop));
-        *self.rec_stop.borrow_mut() = Some(stop);
-        *self.rec_rx.borrow_mut() = Some(rx);
-        let mut rec = state.recording.borrow_mut();
-        rec.active = true;
-        rec.started = Some(std::time::Instant::now());
-        rec.warning = None;
-        rec.last_message = Some("Status: Going live…".into());
+        self.mark_session_started(state, stop, rx);
+        state.recording.borrow_mut().last_message = Some("Status: Going live…".into());
         Ok(())
     }
 
@@ -281,11 +318,68 @@ impl RecordPage {
 
     pub fn refresh(&self, state: &Rc<StudioState>, snap: &SystemSnapshot) {
         self.watch_disk(state, snap);
+        self.drain_portal(state);
         self.drain_record(state);
         self.sync_sessions(state);
         self.pump(state, snap);
         self.refresh_record_chrome(state);
         self.refresh_live_chrome(state);
+    }
+
+    fn begin_share(&self, state: &Rc<StudioState>, then_record: bool, then_live: bool) {
+        if self.portal_rx.borrow().is_some() {
+            self.share_note
+                .set_text("A share dialog is already open. Choose a screen or cancel it.");
+            return;
+        }
+        self.pending_record.set(then_record);
+        self.pending_live.set(then_live);
+        let want_window = state.settings.borrow().video.window_capture;
+        *self.portal_rx.borrow_mut() = Some(crate::live::portal::request_share(want_window));
+        self.share_note
+            .set_text("Choose a monitor or window in the desktop portal dialog.");
+        *state.desktop_note.borrow_mut() = Some("Waiting for the portal…".into());
+    }
+
+    fn drain_portal(&self, state: &Rc<StudioState>) {
+        let result = self
+            .portal_rx
+            .borrow()
+            .as_ref()
+            .and_then(|rx| rx.try_recv().ok());
+        let Some(result) = result else { return };
+        *self.portal_rx.borrow_mut() = None;
+        match result {
+            Ok(share) => {
+                let label = format!(
+                    "Shared {}×{} (node {})",
+                    share.stream.width, share.stream.height, share.stream.node_id
+                );
+                self.share_note.set_text(&label);
+                *state.desktop_note.borrow_mut() = Some(label);
+                *state.desktop_share.borrow_mut() = Some(share);
+                self.stop_preview();
+                if self.pending_live.replace(false) {
+                    if let Err(err) = self.start_live(state) {
+                        self.alert("Cannot go live", &err);
+                    }
+                } else if self.pending_record.replace(false) {
+                    if let Err(err) = self.start_take(state) {
+                        self.alert("Cannot start recording", &err);
+                    }
+                }
+            }
+            Err(err) => {
+                self.pending_record.set(false);
+                self.pending_live.set(false);
+                self.share_note.set_text(&err);
+                *state.desktop_note.borrow_mut() = Some(err.clone());
+                if err.to_ascii_lowercase().contains("cancel") {
+                    return;
+                }
+                self.alert("Screen share failed", &err);
+            }
+        }
     }
 
     pub fn pump(&self, state: &StudioState, snap: &SystemSnapshot) {
@@ -356,18 +450,47 @@ impl RecordPage {
             self.ensure_meter(&desk, &desk_label, false);
             return;
         }
+        if matches!(mode, RecordingMode::Screen | RecordingMode::Presentation) {
+            if let Some(share) = state.desktop_share.borrow().as_ref() {
+                let key = (format!("desk:{}", share.stream.node_id), false);
+                let live = self.live.borrow_mut();
+                if live.cam_key.as_ref() != Some(&key) {
+                    drop(live);
+                    self.stop_preview();
+                    let input = DesktopVideoInput {
+                        node_id: share.stream.node_id,
+                        fd: share.fd,
+                        width: share.stream.width,
+                        height: share.stream.height,
+                    };
+                    let stop = Arc::new(AtomicBool::new(false));
+                    let rx = preview_live::start_desktop(input, Arc::clone(&stop));
+                    let mut live = self.live.borrow_mut();
+                    live.preview_stop = Some(stop);
+                    live.preview_rx = Some(rx);
+                    live.cam_key = Some(key);
+                    self.preview
+                        .show_message("Starting desktop…", "Opening the shared PipeWire stream.");
+                }
+            } else {
+                self.stop_preview();
+                self.preview.show_message(
+                    "Share a screen",
+                    &format!(
+                        "{display_label}\n\nClick Share screen (or Start Recording) to open the desktop portal. Live frames appear after you grant a monitor or window."
+                    ),
+                );
+            }
+            self.ensure_meter(&mic, &mic_label, true);
+            self.ensure_meter(&desk, &desk_label, false);
+            return;
+        }
         if !want_cam {
             self.stop_preview();
             match mode {
                 RecordingMode::Voice => self.preview.show_message(
                     "Voice mode",
                     "Camera preview is off. Meters stay live so you can set level.",
-                ),
-                RecordingMode::Screen | RecordingMode::Presentation => self.preview.show_message(
-                    "Selected display",
-                    &format!(
-                        "{display_label}\n\nLive desktop frames need portal capture in a later milestone. This is the selected monitor, not a fake picture."
-                    ),
                 ),
                 _ => {}
             }
@@ -492,12 +615,106 @@ impl RecordPage {
     }
 
     fn start_take(&self, state: &Rc<StudioState>) -> Result<(), String> {
+        let mode = state.settings.borrow().last_recording_mode;
+        let engine = state.settings.borrow().advanced.engine;
+        if engine == EnginePreference::Obs {
+            return self.start_obs(state, false);
+        }
+        if mode.needs_desktop_share() {
+            if state.desktop_share.borrow().is_none() {
+                self.begin_share(state, true, false);
+                return Ok(());
+            }
+            return self.start_desktop_take(state, None);
+        }
         let disk = state.monitor.borrow_mut().snapshot().disk;
         let request = plan::build_request(state, &self.inventory.borrow(), disk)?;
         let remux = state.settings.borrow().recording.remux_to_mp4;
         self.stop_preview();
         let stop = Arc::new(AtomicBool::new(false));
         let rx = rec_live::start_session(request, remux, Arc::clone(&stop));
+        self.mark_session_started(state, stop, rx);
+        Ok(())
+    }
+
+    fn start_desktop_take(&self, state: &Rc<StudioState>, rtmp: Option<String>) -> Result<(), String> {
+        let share = state
+            .desktop_share
+            .borrow()
+            .clone()
+            .ok_or_else(|| "Share a screen first.".to_string())?;
+        if !scs_ffmpeg::gst_available() {
+            return Err("Install gstreamer1.0-tools (gst-launch-1.0) to record the desktop.".into());
+        }
+        let disk = state.monitor.borrow_mut().snapshot().disk;
+        let request = plan::build_request(state, &self.inventory.borrow(), disk)?;
+        let settings = state.settings.borrow();
+        let pip = if settings.last_recording_mode == RecordingMode::Presentation {
+            let camera = request
+                .camera
+                .as_ref()
+                .ok_or_else(|| "Presentation needs a camera for the picture-in-picture.".to_string())?;
+            let spec = PipSpec {
+                corner: PipCorner::from_key(&settings.video.pip_corner),
+                width: 480,
+                height: 270,
+            };
+            let (x, y) = spec.corner.offset(
+                share.stream.width,
+                share.stream.height,
+                spec.width,
+                spec.height,
+                24,
+            );
+            Some(GstPip {
+                camera_path: camera.path.clone(),
+                x,
+                y,
+                width: spec.width,
+                height: spec.height,
+            })
+        } else {
+            None
+        };
+        let remux = settings.recording.remux_to_mp4
+            && (rtmp.is_none() || settings.streaming.record_while_live);
+        let prefer_nvenc = state.caps.h264_nvenc.is_available();
+        drop(settings);
+        self.stop_preview();
+        let stop = Arc::new(AtomicBool::new(false));
+        let rx = rec_live::start_desktop_session(
+            DesktopVideoInput {
+                node_id: share.stream.node_id,
+                fd: share.fd,
+                width: share.stream.width,
+                height: share.stream.height,
+            },
+            request.mic.clone(),
+            pip,
+            request.output.clone(),
+            prefer_nvenc,
+            rtmp,
+            remux,
+            Arc::clone(&stop),
+        );
+        self.mark_session_started(state, stop, rx);
+        Ok(())
+    }
+
+    fn start_obs(&self, state: &Rc<StudioState>, stream: bool) -> Result<(), String> {
+        self.stop_preview();
+        let stop = Arc::new(AtomicBool::new(false));
+        let rx = rec_live::start_obs_session(stream, Arc::clone(&stop));
+        self.mark_session_started(state, stop, rx);
+        Ok(())
+    }
+
+    fn mark_session_started(
+        &self,
+        state: &StudioState,
+        stop: Arc<AtomicBool>,
+        rx: Receiver<RecordEvent>,
+    ) {
         *self.rec_stop.borrow_mut() = Some(stop);
         *self.rec_rx.borrow_mut() = Some(rx);
         let mut rec = state.recording.borrow_mut();
@@ -508,7 +725,6 @@ impl RecordPage {
         rec.last_message = Some("Status: Starting…".into());
         rec.last_marker = None;
         *state.markers.borrow_mut() = MarkerFile::new("pending");
-        Ok(())
     }
 
     fn drain_record(&self, state: &Rc<StudioState>) {
@@ -625,10 +841,11 @@ impl RecordPage {
             self.rec_note.set_text(reason);
         } else {
             self.rec_btn.set_sensitive(true);
-            self.rec_btn
-                .set_tooltip_text(Some("Writes a crash-safe MKV. Screen modes stay unavailable."));
+            self.rec_btn.set_tooltip_text(Some(
+                "Writes a crash-safe MKV. Screen modes use the desktop portal + GStreamer.",
+            ));
             self.rec_note.set_text(
-                "Camera, Voice, and Creator write an MKV. Creator muxes desktop audio as a second track when a monitor is selected.",
+                "Camera, Voice, and Creator use FFmpeg. Screen and Presentation use the portal + GStreamer. OBS is optional in Settings.",
             );
         }
     }

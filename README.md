@@ -5,8 +5,10 @@ tutorials, and voice — with a simple creator-focused interface. The long-term
 engine is OBS Studio (via WebSocket) with FFmpeg + NVIDIA NVENC as the
 tooling and fallback path.
 
-**Milestone 8** ships local creator extensions. Cloud AI and YouTube OAuth stay
-disabled tiles. GO LIVE still requires a stored key and an flv probe.
+Screen and Presentation record through the **xdg-desktop-portal ScreenCast**
+session plus **GStreamer `pipewiresrc`**. Camera / Voice / Creator still use
+FFmpeg. OBS WebSocket is an optional engine when OBS is already running. Cloud
+AI and YouTube OAuth stay disabled.
 
 ## Screenshots
 
@@ -20,17 +22,17 @@ disabled tiles. GO LIVE still requires a stored key and an flv probe.
 | Diagnostics | ![Diagnostics](docs/screenshots/diagnostics.png) |
 | First-run wizard | ![Wizard](docs/screenshots/wizard.png) |
 
-## What works in Milestone 5
+## What works
 
 - Everything from Milestone 1 (shell, settings, wizard, diagnostics, dashboard)
 - Camera selector with name, resolution, and pixel format (not raw `/dev/videoN` as the only label)
 - PipeWire microphone and desktop-monitor lists from `pw-dump`
 - Live camera preview in the large preview area, with an optional mirror flip
 - Real-time mic and desktop meters (peak + average) plus a clipping warning
-- Multi-monitor display tiles from the session; window and region capture stay labeled unavailable
+- Multi-monitor display tiles from the session; window capture uses the portal picker; region stays labeled unavailable
 - Last camera, mic, desktop source, display, and recording mode persist in settings
 - Background discovery — the UI does not freeze while probing devices
-- **START RECORDING** for Camera (cam+mic), Voice (mic), and Creator (cam+mic+desktop)
+- **START RECORDING** for Camera, Voice, Creator, **Screen** (portal desktop), and **Presentation** (desktop + webcam PIP)
 - Separate tracks: mixed + mic + desktop + optional music, each with mute and volume
 - Mic chain in FFmpeg: HPF → `afftdn` → gate → EQ → compressor → limiter
 - Presets: Natural (default, light), Podcast, Broadcast, Quiet Room, Noisy Room, Voice, Raw
@@ -42,8 +44,9 @@ disabled tiles. GO LIVE still requires a stored key and an flv probe.
 - Teleprompter: paste script, font size, scroll speed, pause, mirrored, overlay window
 - In-app hotkeys (F9 start/stop, F8 marker, F7 mute, F6 camera, F5 teleprompter)
 - Markers write `*.markers.json` beside the take for later chapters
-- Local extensions: thumbnail, chapters-from-markers, 9:16 scale/pad, silencedetect
-- Disabled tiles: Whisper, captions, highlights, Shorts, AI title, YouTube upload
+- Local extensions: thumbnail, chapters-from-markers, 9:16, silencedetect, silence-remove
+- Whisper only if a local binary **and** an already-downloaded model exist
+- Disabled tiles: captions, highlights, Shorts, AI title, YouTube upload
 - Crash-safe **MKV** names like `2026-09-20_YouTube_Record_001.mkv` — never overwrites
 - Hardware encode when FFmpeg lists NVENC (H.264 / HEVC / AV1); otherwise libx264
 - Quality presets: YouTube Standard / High Quality / 4K, Archival, Small File, Custom
@@ -54,12 +57,12 @@ disabled tiles. GO LIVE still requires a stored key and an flv probe.
 
 | Control | Label |
 | --- | --- |
-| Screen / Presentation record | Unavailable — no portal/desktop grab yet |
-| GO LIVE | Off until a keyring key + flv muxer probe pass |
-| Window / region capture | Structured, labeled unavailable |
-| Live desktop frames | Selected-display placeholder (portal capture is later) |
-| Global hotkeys | Unavailable — no rootless compositor grab |
-| Mic speaker monitor loop | Not created — use headphones + the desktop mixer |
+| Region capture | Not offered by the COSMIC ScreenCast portal |
+| Global compositor hotkeys | COSMIC has no GlobalShortcuts portal. Use in-app keys or `shadow-creator-studio --action start-stop` |
+| Mic speaker loopback | Never created by default. Headphones + desktop mixer, or an explicit later opt-in |
+| YouTube OAuth / cloud AI | No hardcoded credentials |
+| Whisper without a local model | Nothing is downloaded automatically |
+| GO LIVE | Needs `secret-tool` + a stored key + an flv/RTMP path. The key is never logged |
 
 ## Dependencies
 
@@ -70,27 +73,27 @@ disabled tiles. GO LIVE still requires a stored key and an flv probe.
 - `libgtk-4-dev` and `libadwaita-1-dev` to *compile* `scs-ui`
 - PipeWire (Pulse compatibility is fine)
 - FFmpeg 6.x; NVIDIA NVENC encoders when an NVIDIA GPU is present
-- Optional: OBS Studio with obs-websocket (M3+), EasyEffects (M4 concept)
+- `gstreamer1.0-tools` plus `pipewiresrc` plugins for Screen / Presentation
+- `secret-tool` (`sudo apt install libsecret-tools`) to store stream keys
+- Optional: OBS Studio with obs-websocket enabled; EasyEffects
 
 Foundation crates and tests compile without GTK headers.
 
 ## Install
 
-This repository is the source tree. There is no packaged `.deb` yet.
-
 ```bash
 git clone https://github.com/ShadowfetchLinux/shadow-creator-studio.git
 cd shadow-creator-studio
+sudo apt install build-essential pkg-config libgtk-4-dev libadwaita-1-dev \
+  gstreamer1.0-tools gstreamer1.0-plugins-good gstreamer1.0-pipewire \
+  ffmpeg pipewire-bin libsecret-tools
+cargo build -p scs-ui --release
 ```
 
-Install GTK development packages if you want the window (requires admin; this
-project never runs `sudo` for you):
+User-local desktop entry (no sudo): see [packaging/README.md](packaging/README.md).
+Optional `.deb` recipe: `./packaging/make-deb.sh` after the release build.
 
-```bash
-sudo apt install build-essential pkg-config libgtk-4-dev libadwaita-1-dev
-```
-
-Full package list: [BUILDING.md](BUILDING.md).
+This project never runs `sudo` for you. Full package list: [BUILDING.md](BUILDING.md).
 
 ## Run
 
@@ -146,15 +149,15 @@ GPU load, VRAM, and temperature through NVML when initialization succeeds. It
 does not spawn `nvidia-smi` every tick. While recording, the status chip shows
 the FFmpeg encoder actually in use.
 
-## Known limitations (M4)
+## Known limitations
 
-- Screen and Presentation do **not** record. Portal / desktop grab is later.
-- GO LIVE stays disabled.
-- Recording uses **FFmpeg** (structured argv). OBS WebSocket is still later.
-- Window and region capture are structured types only.
-- Camera preview pauses while recording so the take can own V4L2.
+- Region capture is unavailable on the COSMIC portal.
+- FFmpeg has no PipeWire demuxer here; desktop capture is portal + GStreamer, not `x11grab`.
+- OBS WebSocket records the **current OBS scene**. This app never writes OBS configs or secrets into the repo.
+- GO LIVE needs `secret-tool`. If it is missing, install `libsecret-tools`.
+- Global hotkeys are in-app, plus `--action` for COSMIC Custom Shortcuts.
+- Camera preview pauses while an FFmpeg camera take owns V4L2.
 - The app never writes WirePlumber, EasyEffects, or default source/sink configuration.
-- OBS WebSocket is detected as a binary/plugin at most; no login, no scenes.
 
 ## License
 

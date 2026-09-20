@@ -41,8 +41,11 @@ pub fn build_request(
         "mkv",
     );
     let camera = match mode {
-        RecordingMode::Voice => None,
-        _ => Some(camera_input(
+        RecordingMode::Voice | RecordingMode::Screen => None,
+        RecordingMode::Presentation
+        | RecordingMode::Camera
+        | RecordingMode::Creator
+        | RecordingMode::Custom => Some(camera_input(
             inventory,
             settings.camera.device.as_deref(),
             settings.recording.quality.width(),

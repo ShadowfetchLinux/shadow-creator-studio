@@ -35,11 +35,10 @@ pub fn plan_record(request: &RecordPlanRequest) -> Result<PlannedCommand, String
         RecordingMode::Camera | RecordingMode::Creator | RecordingMode::Custom => {
             plan_camera(request)
         }
-        RecordingMode::Screen | RecordingMode::Presentation => Err(request
-            .mode
-            .unavailable_reason()
-            .unwrap_or("This mode cannot record yet.")
-            .into()),
+        RecordingMode::Screen | RecordingMode::Presentation => Err(
+            "Screen and Presentation use the desktop portal + GStreamer, not an FFmpeg V4L2 plan."
+                .into(),
+        ),
     }
 }
 
@@ -303,7 +302,7 @@ mod tests {
     #[test]
     fn screen_mode_is_refused() {
         let err = plan_record(&request(RecordingMode::Screen, None)).unwrap_err();
-        assert!(err.to_ascii_lowercase().contains("desktop"));
+        assert!(err.to_ascii_lowercase().contains("portal") || err.to_ascii_lowercase().contains("gstreamer"));
     }
 
     #[test]

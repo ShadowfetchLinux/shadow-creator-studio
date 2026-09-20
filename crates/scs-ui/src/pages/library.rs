@@ -193,6 +193,18 @@ impl LibraryPage {
                     Some(jobs::run_tool_cmd(scs_ffmpeg::silence_detect_args(&entry.path)));
                 self.status.set_text("Scanning for silence…");
             }
+            scs_core::ExtensionId::SilenceRemove => {
+                *self.job_rx.borrow_mut() = Some(jobs::run_tool(scs_ffmpeg::silence_remove(&entry.path)));
+                self.status.set_text("Removing silence…");
+            }
+            scs_core::ExtensionId::Whisper => {
+                let bin = scs_core::extensions::whisper_binary()
+                    .ok_or_else(|| "No local Whisper binary was found.".to_string())?;
+                let model = scs_core::extensions::whisper_model()
+                    .ok_or_else(|| "No local Whisper model was found. Nothing will be downloaded.".to_string())?;
+                *self.job_rx.borrow_mut() = Some(jobs::run_whisper(bin, model, entry.path.clone()));
+                self.status.set_text("Transcribing locally…");
+            }
             _ => return Err("That extension is not implemented locally.".into()),
         }
         Ok(())

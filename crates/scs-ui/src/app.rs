@@ -114,7 +114,7 @@ pub fn start(app: &adw::Application) {
         about.set_version(scs_core::APP_VERSION);
         about.set_developer_name("Shadowfetch");
         about.set_comments(
-            "Milestone 8: local extensions (thumbnail, chapters, 9:16, silence). Cloud AI tiles stay disabled.",
+            "Linux creator studio: portal screen capture, presentation PIP, library tools, optional OBS WebSocket. Cloud AI and YouTube OAuth stay disabled.",
         );
         about.set_license_type(gtk::License::MitX11);
         about.present();
@@ -177,6 +177,36 @@ pub fn start(app: &adw::Application) {
     if !state.wizard_completed() {
         wizard::present(&window, &state);
     }
+
+    let ipc_rx = std::rc::Rc::new(std::cell::RefCell::new(crate::ipc::listen()));
+    let state_i = Rc::clone(&state);
+    let record_i = Rc::clone(&record);
+    let tele_i = Rc::clone(&teleprompter);
+    let stack_i = stack.clone();
+    glib::timeout_add_local(Duration::from_millis(120), move || {
+        while let Ok(action) = ipc_rx.borrow().try_recv() {
+            match action.as_str() {
+                "start-stop" => record_i.on_hotkey_record(&state_i),
+                "marker" => record_i.drop_marker(&state_i),
+                "mute-mic" => {
+                    let next = !state_i.settings.borrow().audio.mic_muted;
+                    state_i.settings.borrow_mut().audio.mic_muted = next;
+                    let _ = state_i.persist();
+                }
+                "toggle-camera" => state_i.camera_preview.set(!state_i.camera_preview.get()),
+                "toggle-teleprompter" => {
+                    if stack_i.visible_child_name().as_deref() == Some("teleprompter") {
+                        stack_i.set_visible_child_name("record");
+                    } else {
+                        stack_i.set_visible_child_name("teleprompter");
+                    }
+                }
+                "pause" => tele_i.toggle_pause(&state_i),
+                _ => {}
+            }
+        }
+        glib::ControlFlow::Continue
+    });
 
     let state_t = Rc::clone(&state);
     let record_t = Rc::clone(&record);

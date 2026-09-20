@@ -21,6 +21,43 @@ pub fn run_tool_cmd(command: PlannedCommand) -> Receiver<JobEvent> {
     spawn_cmd(command, None)
 }
 
+pub fn run_whisper(bin: PathBuf, model: PathBuf, input: PathBuf) -> Receiver<JobEvent> {
+    let dest = input.with_extension("srt");
+    let name = bin
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let mut args = Vec::new();
+    if name.contains("whisper-cli") || name.contains("whisper-cpp") {
+        args.push("-m".into());
+        args.push(model.into());
+        args.push("-f".into());
+        args.push(input.into());
+        args.push("-osrt".into());
+    } else {
+        let model_name = model
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "tiny".into());
+        args.push(input.as_os_str().to_os_string());
+        args.push("--model".into());
+        args.push(model_name.into());
+        args.push("--output_format".into());
+        args.push("srt".into());
+        if let Some(dir) = input.parent() {
+            args.push("--output_dir".into());
+            args.push(dir.as_os_str().to_os_string());
+        }
+    }
+    spawn_cmd(
+        PlannedCommand {
+            program: bin,
+            args,
+        },
+        Some(dest),
+    )
+}
+
 fn spawn_cmd(command: PlannedCommand, output: Option<PathBuf>) -> Receiver<JobEvent> {
     let (tx, rx) = mpsc::channel();
     thread::Builder::new()

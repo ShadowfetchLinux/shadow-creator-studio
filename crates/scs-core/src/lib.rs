@@ -35,7 +35,10 @@ pub use recording::{
     RecordingMetadata, VideoStreamMetadata,
 };
 pub use redaction::{redact_json, redact_text};
-pub use secrets::{lookup_stream_key, redact_secret, store_stream_key, STREAM_KEY_ATTR};
+pub use secrets::{
+    detect_backend, lookup_obs_password, lookup_stream_key, redact_secret, store_obs_password,
+    store_stream_key, SecretBackend, OBS_PASSWORD_ATTR, STREAM_KEY_ATTR,
+};
 pub use settings::{Settings, SettingsStore, SETTINGS_VERSION};
 pub use wizard::WizardState;
 

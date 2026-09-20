@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Shadow Creator Studio">
+  <rect width="128" height="128" rx="28" fill="#1a1b1e"/>
+  <rect x="18" y="28" width="92" height="56" rx="8" fill="#2d3139" stroke="#7aa2f7" stroke-width="4"/>
+  <circle cx="64" cy="56" r="14" fill="#e05d5d"/>
+  <rect x="34" y="96" width="60" height="10" rx="5" fill="#7aa2f7"/>
+</svg>

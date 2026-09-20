@@ -64,13 +64,16 @@ sudo apt install libpipewire-0.3-dev
 # M2 runtime helpers (usually already present with PipeWire)
 sudo apt install pipewire-bin ffmpeg v4l-utils
 
-# Keyring backend (when stream keys are stored)
-sudo apt install libsecret-1-dev
+# Stream-key / OBS password storage (CLI talks to the Secret Service)
+sudo apt install libsecret-tools
+
+# Desktop capture (Screen / Presentation)
+sudo apt install gstreamer1.0-tools gstreamer1.0-plugins-good gstreamer1.0-plugins-base gstreamer1.0-pipewire
 
 # Optional: EasyEffects
 sudo apt install easyeffects
 
-# Optional: OBS (primary record engine from M3)
+# Optional: OBS (WebSocket engine when already running)
 sudo apt install obs-studio
 ```
 
