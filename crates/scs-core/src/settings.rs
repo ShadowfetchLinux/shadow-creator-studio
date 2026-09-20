@@ -251,9 +251,14 @@ impl Default for RecordingSettings {
 pub struct StreamingSettings {
     pub platform: String,
     pub server_url: String,
-    /// Secret Service attribute name later. Must never hold a raw stream key.
+    /// Secret Service attribute name. Must never hold a raw stream key.
     pub stream_key_ref: Option<String>,
     pub enabled: bool,
+    pub rtmps: bool,
+    pub video_bitrate: String,
+    pub reconnect_attempts: u32,
+    pub reconnect_delay_ms: u64,
+    pub record_while_live: bool,
 }
 
 impl Default for StreamingSettings {
@@ -263,6 +268,11 @@ impl Default for StreamingSettings {
             server_url: String::new(),
             stream_key_ref: None,
             enabled: false,
+            rtmps: true,
+            video_bitrate: "6000k".into(),
+            reconnect_attempts: 8,
+            reconnect_delay_ms: 2000,
+            record_while_live: true,
         }
     }
 }

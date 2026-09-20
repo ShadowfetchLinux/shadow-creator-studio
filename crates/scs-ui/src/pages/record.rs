@@ -32,6 +32,8 @@ pub struct RecordPage {
     window: adw::ApplicationWindow,
     rec_btn: gtk::Button,
     rec_note: gtk::Label,
+    live_btn: gtk::Button,
+    live_note: gtk::Label,
     rec_stop: RefCell<Option<Arc<AtomicBool>>>,
     rec_rx: RefCell<Option<Receiver<RecordEvent>>>,
     tracks: tracks::TrackMixer,
@@ -114,9 +116,9 @@ impl RecordPage {
         live_btn.add_css_class("scs-live-button");
         live_btn.set_sensitive(false);
         live_btn.set_halign(gtk::Align::Start);
-        live_btn.set_tooltip_text(Some("Available in a later milestone (M8)"));
+        live_btn.set_tooltip_text(Some("Stores a key and passes the RTMP probe first."));
         let live_note = gtk::Label::new(Some(
-            "YouTube Live is designed here for later expansion. Unavailable in Milestone 3.",
+            "GO LIVE needs a keyring-backed stream key and an FFmpeg flv muxer. The key is never logged.",
         ));
         live_note.add_css_class("scs-unavailable");
         live_note.set_halign(gtk::Align::Start);
@@ -161,6 +163,8 @@ impl RecordPage {
             window: window.clone(),
             rec_btn: rec,
             rec_note,
+            live_btn,
+            live_note,
             rec_stop: RefCell::new(None),
             rec_rx: RefCell::new(None),
             tracks,
@@ -174,12 +178,71 @@ impl RecordPage {
         self.rec_btn.connect_clicked(move |_| {
             page_c.on_record_clicked(&state_c);
         });
+        let page_l = Rc::clone(page);
+        let state_l = Rc::clone(state);
+        self.live_btn.connect_clicked(move |_| {
+            if let Err(err) = page_l.start_live(&state_l) {
+                page_l.alert("Cannot go live", &err);
+            }
+        });
         let page_k = Rc::clone(page);
         let state_k = Rc::clone(state);
         self.tracks.calibrate.connect_clicked(move |_| {
             page_k.calibrate_mic(&state_k);
         });
         self.refresh_record_chrome(state);
+        self.refresh_live_chrome(state);
+    }
+
+    fn start_live(&self, state: &Rc<StudioState>) -> Result<(), String> {
+        if state.recording.borrow().active {
+            return Err("Stop the current take first. Live uses a new FFmpeg tee session.".into());
+        }
+        let key = scs_core::lookup_stream_key()?.ok_or_else(|| {
+            "Store a YouTube stream key in Settings (system keyring) first.".to_string()
+        })?;
+        let streaming = state.settings.borrow().streaming.clone();
+        let url = scs_ffmpeg::build_rtmp_url(&streaming.server_url, &key, streaming.rtmps)?;
+        let disk = state.monitor.borrow_mut().snapshot().disk;
+        let request = crate::live::plan::attach_stream(
+            plan::build_request(state, &self.inventory.borrow(), disk)?,
+            Some(url),
+            streaming.record_while_live,
+        );
+        let remux = state.settings.borrow().recording.remux_to_mp4 && streaming.record_while_live;
+        self.stop_preview();
+        let stop = Arc::new(AtomicBool::new(false));
+        let rx = rec_live::start_session(request, remux, Arc::clone(&stop));
+        *self.rec_stop.borrow_mut() = Some(stop);
+        *self.rec_rx.borrow_mut() = Some(rx);
+        let mut rec = state.recording.borrow_mut();
+        rec.active = true;
+        rec.started = Some(std::time::Instant::now());
+        rec.warning = None;
+        rec.last_message = Some("Status: Going live…".into());
+        Ok(())
+    }
+
+    fn refresh_live_chrome(&self, state: &StudioState) {
+        let key_present = state.settings.borrow().streaming.stream_key_ref.is_some();
+        let muxers = state.muxers.borrow();
+        let probe = scs_ffmpeg::evaluate_probe(key_present, Ok("rtmp://placeholder/live"), &muxers);
+        if state.recording.borrow().active {
+            self.live_btn.set_sensitive(false);
+            self.live_btn
+                .set_tooltip_text(Some("A session is already running."));
+            let dropped = state
+                .recording
+                .borrow()
+                .dropped
+                .map(|n| format!("Stream health · dropped frames: {n}"))
+                .unwrap_or_else(|| "Stream health: waiting for FFmpeg progress.".into());
+            self.live_note.set_text(&dropped);
+            return;
+        }
+        self.live_btn.set_sensitive(probe.ok && key_present);
+        self.live_btn.set_tooltip_text(Some(probe.reason.as_str()));
+        self.live_note.set_text(&probe.reason);
     }
 
     fn calibrate_mic(&self, state: &Rc<StudioState>) {
@@ -222,6 +285,7 @@ impl RecordPage {
         self.sync_sessions(state);
         self.pump(state, snap);
         self.refresh_record_chrome(state);
+        self.refresh_live_chrome(state);
     }
 
     pub fn pump(&self, state: &StudioState, snap: &SystemSnapshot) {

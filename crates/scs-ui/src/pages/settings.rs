@@ -16,7 +16,7 @@ pub fn build(state: &Rc<StudioState>, window: &adw::ApplicationWindow) -> gtk::S
     page.add(&audio_group(state));
     page.add(&camera_group(state));
     page.add(&recording_group(state, window));
-    page.add(&streaming_group());
+    page.add(&streaming_group(state));
     page.add(&hotkeys_group(state));
     page.add(&advanced_group(state));
     page.add(&restore_group(state, window));
@@ -269,22 +269,86 @@ fn recording_group(state: &Rc<StudioState>, window: &adw::ApplicationWindow) -> 
     group
 }
 
-fn streaming_group() -> adw::PreferencesGroup {
+fn streaming_group(state: &Rc<StudioState>) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::new();
     group.set_title("Streaming");
-    group.set_description(Some("YouTube Live lands in Milestone 8. Keys stay out of this file."));
+    group.set_description(Some(
+        "YouTube RTMP/RTMPS. The key is stored with secret-tool (libsecret), never in settings.json, and never logged.",
+    ));
 
     let platform = adw::ActionRow::builder()
         .title("Platform")
-        .subtitle("YouTube")
+        .subtitle("YouTube (no OAuth in this milestone)")
         .build();
     group.add(&platform);
 
-    let key = adw::ActionRow::builder()
-        .title("Stream key")
-        .subtitle("Stored in the system keyring in a later milestone")
-        .sensitive(false)
+    let server = adw::EntryRow::builder()
+        .title("Ingest URL (blank = YouTube default)")
+        .text(state.settings.borrow().streaming.server_url.as_str())
         .build();
+    let state_s = Rc::clone(state);
+    server.connect_changed(move |row| {
+        state_s.settings.borrow_mut().streaming.server_url = row.text().to_string();
+        let _ = state_s.persist();
+    });
+    group.add(&server);
+
+    let rtmps = adw::SwitchRow::builder()
+        .title("Prefer RTMPS")
+        .active(state.settings.borrow().streaming.rtmps)
+        .build();
+    let state_r = Rc::clone(state);
+    rtmps.connect_active_notify(move |row| {
+        state_r.settings.borrow_mut().streaming.rtmps = row.is_active();
+        let _ = state_r.persist();
+    });
+    group.add(&rtmps);
+
+    let bitrate = adw::EntryRow::builder()
+        .title("Video bitrate")
+        .text(state.settings.borrow().streaming.video_bitrate.as_str())
+        .build();
+    let state_b = Rc::clone(state);
+    bitrate.connect_changed(move |row| {
+        state_b.settings.borrow_mut().streaming.video_bitrate = row.text().to_string();
+        let _ = state_b.persist();
+    });
+    group.add(&bitrate);
+
+    let record = adw::SwitchRow::builder()
+        .title("Record locally while live")
+        .subtitle("FFmpeg tee: MKV + RTMP")
+        .active(state.settings.borrow().streaming.record_while_live)
+        .build();
+    let state_l = Rc::clone(state);
+    record.connect_active_notify(move |row| {
+        state_l.settings.borrow_mut().streaming.record_while_live = row.is_active();
+        let _ = state_l.persist();
+    });
+    group.add(&record);
+
+    let key = adw::PasswordEntryRow::builder()
+        .title("YouTube stream key")
+        .build();
+    let save = gtk::Button::with_label("Store in keyring");
+    save.add_css_class("flat");
+    let key_entry = key.clone();
+    let state_k = Rc::clone(state);
+    save.connect_clicked(move |_| {
+        let value = key_entry.text().to_string();
+        match scs_core::store_stream_key(&value) {
+            Ok(()) => {
+                state_k.settings.borrow_mut().streaming.stream_key_ref =
+                    Some(scs_core::STREAM_KEY_ATTR.into());
+                let _ = state_k.persist();
+                key_entry.set_text("");
+            }
+            Err(err) => {
+                state_k.recording.borrow_mut().last_message = Some(err);
+            }
+        }
+    });
+    key.add_suffix(&save);
     group.add(&key);
     group
 }

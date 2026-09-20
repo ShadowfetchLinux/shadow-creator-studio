@@ -199,7 +199,7 @@ Disabled + labeled. Examples already in the shell:
 | **M5** | Library + FFmpeg tools | Folder index, sidecar, remux/export/trim/normalize/GIF/thumb |
 | **M6** | Library | Index, markers, remux MKV→MP4 without re-encode, never delete MKV until verified |
 | **M6** | Teleprompter + markers + hotkeys | In-app accelerators, chapter sidecar, no global grabs |
-| **M8** | YouTube Live | GO LIVE, keyring-backed stream key, YouTube-friendly encode |
+| **M7** | Streaming architecture | RTMP/RTMPS, secret-tool, tee record+stream, reconnect policy |
 
 ### What M1 includes vs later
 

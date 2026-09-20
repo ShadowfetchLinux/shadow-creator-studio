@@ -72,7 +72,20 @@ pub fn build_request(
         output,
         layout,
         chain,
+        stream_url: None,
     })
+}
+
+pub fn attach_stream(
+    mut request: RecordPlanRequest,
+    url: Option<String>,
+    record_while_live: bool,
+) -> RecordPlanRequest {
+    request.stream_url = url;
+    if request.stream_url.is_some() && !record_while_live {
+        request.output = std::path::PathBuf::new();
+    }
+    request
 }
 
 fn camera_input(

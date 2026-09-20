@@ -114,7 +114,7 @@ pub fn start(app: &adw::Application) {
         about.set_version(scs_core::APP_VERSION);
         about.set_developer_name("Shadowfetch");
         about.set_comments(
-            "Milestone 6: teleprompter, markers, in-app hotkeys. Global shortcuts are not available on this desktop.",
+            "Milestone 7: RTMP architecture and keyring-backed keys. GO LIVE stays off until a key is stored and the flv probe passes.",
         );
         about.set_license_type(gtk::License::MitX11);
         about.present();

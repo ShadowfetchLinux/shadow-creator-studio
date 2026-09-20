@@ -26,6 +26,7 @@ pub struct RecordPlanRequest {
     pub output: PathBuf,
     pub layout: TrackLayout,
     pub chain: AudioChain,
+    pub stream_url: Option<String>,
 }
 
 pub fn plan_record(request: &RecordPlanRequest) -> Result<PlannedCommand, String> {
@@ -58,7 +59,7 @@ fn plan_voice(request: &RecordPlanRequest) -> Result<PlannedCommand, String> {
     b = pulse_input(b, mic);
     b = apply_audio_graph(b, request, 0, None, None);
     b = encode_audio(b);
-    Ok(b.arg("-f").arg("matroska").output(&request.output).build())
+    Ok(finish_output(b, request))
 }
 
 fn plan_camera(request: &RecordPlanRequest) -> Result<PlannedCommand, String> {
@@ -105,7 +106,24 @@ fn plan_camera(request: &RecordPlanRequest) -> Result<PlannedCommand, String> {
     b = encode_audio(b);
     b = b.map_stream("0:v");
     b = apply_audio_graph(b, request, 1, desk_idx, music_idx);
-    Ok(b.arg("-f").arg("matroska").output(&request.output).build())
+    Ok(finish_output(b, request))
+}
+
+fn finish_output(builder: FfmpegCommandBuilder, request: &RecordPlanRequest) -> PlannedCommand {
+    if let Some(url) = request.stream_url.as_deref() {
+        let tee = if request.output.as_os_str().is_empty() {
+            format!("[f=flv]{url}")
+        } else {
+            crate::stream::tee_outputs(&request.output.to_string_lossy(), url)
+        };
+        builder.arg("-f").arg("tee").arg(tee).build()
+    } else {
+        builder
+            .arg("-f")
+            .arg("matroska")
+            .output(&request.output)
+            .build()
+    }
 }
 
 fn apply_audio_graph(
@@ -245,6 +263,7 @@ mod tests {
                 None,
             ),
             chain: AudioChain::natural(),
+            stream_url: None,
         }
     }
 
@@ -285,6 +304,17 @@ mod tests {
     fn screen_mode_is_refused() {
         let err = plan_record(&request(RecordingMode::Screen, None)).unwrap_err();
         assert!(err.to_ascii_lowercase().contains("desktop"));
+    }
+
+    #[test]
+    fn live_tee_keeps_paths_intact() {
+        let mut req = request(RecordingMode::Camera, None);
+        req.stream_url = Some("rtmp://a.rtmp.youtube.com/live2/SECRETKEY".into());
+        let args = args(&plan_record(&req).unwrap());
+        assert!(args.contains(&"tee".to_string()));
+        assert!(args.iter().any(|a| a.contains("/tmp/out;rm.mkv")));
+        assert!(args.iter().any(|a| a.contains("SECRETKEY")));
+        assert!(!args.iter().any(|a| *a == "rm"));
     }
 
     #[test]

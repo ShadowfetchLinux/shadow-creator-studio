@@ -19,6 +19,7 @@ pub struct StudioState {
     pub teleprompter: RefCell<TeleprompterScript>,
     pub markers: RefCell<MarkerFile>,
     pub camera_preview: std::cell::Cell<bool>,
+    pub muxers: RefCell<String>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -49,6 +50,7 @@ impl StudioState {
             teleprompter: RefCell::new(TeleprompterScript::default()),
             markers: RefCell::new(MarkerFile::new("idle")),
             camera_preview: std::cell::Cell::new(true),
+            muxers: RefCell::new(probe_muxers()),
         }
     }
 
@@ -122,6 +124,15 @@ fn probe_encoders() -> (EncoderCapabilities, String) {
     }
 }
 
+fn probe_muxers() -> String {
+    std::process::Command::new("ffmpeg")
+        .args(["-hide_banner", "-muxers"])
+        .output()
+        .ok()
+        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+        .unwrap_or_default()
+}
+
 pub fn app_subtitle() -> String {
-    format!("{APP_NAME} · Milestone 6")
+    format!("{APP_NAME} · Milestone 7")
 }

@@ -5,8 +5,8 @@ tutorials, and voice — with a simple creator-focused interface. The long-term
 engine is OBS Studio (via WebSocket) with FFmpeg + NVIDIA NVENC as the
 tooling and fallback path.
 
-**Milestone 6** adds a teleprompter, chapter markers, and in-app hotkeys.
-Screen and GO LIVE stay unavailable. Global shortcuts are not available.
+**Milestone 7** adds RTMP/RTMPS architecture and keyring-backed stream keys.
+GO LIVE enables only after a key is stored and FFmpeg lists an flv muxer.
 
 ## Screenshots
 
@@ -53,7 +53,7 @@ Screen and GO LIVE stay unavailable. Global shortcuts are not available.
 | Control | Label |
 | --- | --- |
 | Screen / Presentation record | Unavailable — no portal/desktop grab yet |
-| GO LIVE | Available in a later milestone (M8) |
+| GO LIVE | Off until a keyring key + flv muxer probe pass |
 | Window / region capture | Structured, labeled unavailable |
 | Live desktop frames | Selected-display placeholder (portal capture is later) |
 | Global hotkeys | Unavailable — no rootless compositor grab |
