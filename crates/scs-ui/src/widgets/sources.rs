@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use gtk::prelude::*;
@@ -17,6 +17,7 @@ pub struct SourceSelector {
     display_ids: Rc<RefCell<Vec<String>>>,
     mic_ids: Rc<RefCell<Vec<String>>>,
     desk_ids: Rc<RefCell<Vec<String>>>,
+    suppress: Rc<Cell<bool>>,
 }
 
 impl SourceSelector {
@@ -51,8 +52,21 @@ impl SourceSelector {
         audio_row.append(&mic_wrap);
         audio_row.append(&desk_wrap);
 
-        bind_audio_dropdown(&mic, &mic_ids, Rc::clone(state), AudioKind::Mic);
-        bind_audio_dropdown(&desktop, &desk_ids, Rc::clone(state), AudioKind::Desktop);
+        let suppress = Rc::new(Cell::new(false));
+        bind_audio_dropdown(
+            &mic,
+            &mic_ids,
+            Rc::clone(state),
+            AudioKind::Mic,
+            Rc::clone(&suppress),
+        );
+        bind_audio_dropdown(
+            &desktop,
+            &desk_ids,
+            Rc::clone(state),
+            AudioKind::Desktop,
+            Rc::clone(&suppress),
+        );
 
         root.append(&heading("Camera"));
         root.append(&cameras);
@@ -72,6 +86,7 @@ impl SourceSelector {
             display_ids: Rc::new(RefCell::new(Vec::new())),
             mic_ids,
             desk_ids,
+            suppress,
         }
     }
 
@@ -207,17 +222,21 @@ impl SourceSelector {
         desktop: &[AudioDevice],
         state: &Rc<StudioState>,
     ) {
+        let mic_sel = state.settings.borrow().audio.mic_device.clone();
+        let desk_sel = state.settings.borrow().audio.desktop_device.clone();
         fill_dropdown(
             &self.mic,
             &self.mic_ids,
             mics,
-            state.settings.borrow().audio.mic_device.as_deref(),
+            mic_sel.as_deref(),
+            &self.suppress,
         );
         fill_dropdown(
             &self.desktop,
             &self.desk_ids,
             desktop,
-            state.settings.borrow().audio.desktop_device.as_deref(),
+            desk_sel.as_deref(),
+            &self.suppress,
         );
     }
 }
@@ -233,9 +252,13 @@ fn bind_audio_dropdown(
     ids: &Rc<RefCell<Vec<String>>>,
     state: Rc<StudioState>,
     kind: AudioKind,
+    suppress: Rc<Cell<bool>>,
 ) {
     let ids = Rc::clone(ids);
     drop.connect_selected_notify(move |row| {
+        if suppress.get() {
+            return;
+        }
         let idx = row.selected() as usize;
         let id = ids.borrow().get(idx).cloned();
         let Some(id) = id else { return };
@@ -268,6 +291,7 @@ fn fill_dropdown(
     ids: &Rc<RefCell<Vec<String>>>,
     devices: &[AudioDevice],
     selected: Option<&str>,
+    suppress: &Cell<bool>,
 ) {
     let mut labels = Vec::new();
     let mut stored = Vec::new();
@@ -280,6 +304,7 @@ fn fill_dropdown(
             stored.push(device.id.clone());
         }
     }
+    suppress.set(true);
     let model = gtk::StringList::new(&labels);
     drop.set_model(Some(&model));
     let select = selected
@@ -287,6 +312,7 @@ fn fill_dropdown(
         .unwrap_or(0);
     *ids.borrow_mut() = stored;
     drop.set_selected(select as u32);
+    suppress.set(false);
 }
 
 fn labeled_dropdown(title: &str) -> (gtk::Box, gtk::DropDown, Rc<RefCell<Vec<String>>>) {
