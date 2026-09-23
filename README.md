@@ -15,12 +15,12 @@ AI and YouTube OAuth stay disabled.
 > Add PNG captures under `docs/screenshots/` after you build the GTK shell
 > (`libgtk-4-dev` and `libadwaita-1-dev`).
 
-| Screen | Placeholder |
+| Screen | Placeholder (not captured yet) |
 | --- | --- |
-| Record | ![Record page](docs/screenshots/record.png) |
-| Settings | ![Settings](docs/screenshots/settings.png) |
-| Diagnostics | ![Diagnostics](docs/screenshots/diagnostics.png) |
-| First-run wizard | ![Wizard](docs/screenshots/wizard.png) |
+| Record | `docs/screenshots/record.png` |
+| Settings | `docs/screenshots/settings.png` |
+| Diagnostics | `docs/screenshots/diagnostics.png` |
+| First-run wizard | `docs/screenshots/wizard.png` |
 
 ## What works
 
@@ -82,7 +82,7 @@ Foundation crates and tests compile without GTK headers.
 ## Install
 
 ```bash
-git clone https://github.com/ShadowfetchLinux/shadow-creator-studio.git
+git clone https://github.com/Shadowfetchapps/shadow-creator-studio.git
 cd shadow-creator-studio
 sudo apt install build-essential pkg-config libgtk-4-dev libadwaita-1-dev \
   gstreamer1.0-tools gstreamer1.0-plugins-good gstreamer1.0-pipewire \
